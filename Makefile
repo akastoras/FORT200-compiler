@@ -2,7 +2,7 @@ CC = gcc
 LEXER = lexer.l
 BIN = lexer.lexer.bin
 CFLAGS = -Wall
-LFLAGS = -lm
+LFLAGS = -lm -lfl
 
 all: $(BIN)
 
