@@ -10,8 +10,8 @@
 	#define GET_INT_VALUE(text, base) (strtol(text + 2, NULL, base))
 	#define GET_REAL_VALUE(text, base) (base == 16 ? hextod(text): bintod(text))
 	
-	double hextod(const char *str);
-	double bintod(const char *str);
+	double hextod(char *str);
+	double bintod(char *str);
 %}
 
 %option case-insensitive
@@ -20,9 +20,11 @@
 
 %x COMMENT
 
+WHITECHAR	[ \t\v\n]
+
 DIGIT		[0-9]
 ALPHA		[a-z]
-ALNUM		[{DIGIT}{ALPHA}]
+ALNUM		[0-9a-z]
 ID			(_{ALPHA}((_?{ALNUM})+)*_)|({ALPHA}{ALNUM}*)
 
 VALID_DNUM	([1-9][0-9]*)|0
@@ -66,11 +68,11 @@ LCONST \.(TRUE|FALSE)\.
 "$"			{ printf("Start of COMMENT\n"); BEGIN(COMMENT);}
 
 <<EOF>>			{ printf("Found EOF\n"); return T_EOF;}
-[ \t\v\n]		{}
+{WHITECHAR}		{}
 
  /* Keywords */
 "FUNCTION"		{ printf("Found keyword \"%s\"\n", yytext);	return T_FUNCTION; }
-"SUBROUTINE"	{ printf("Found keyword \"%s\"\n", yytext);	return T_ROUTINE; }
+"SUBROUTINE"	{ printf("Found keyword \"%s\"\n", yytext);	return T_SUBROUTINE; }
 "END"			{ printf("Found keyword \"%s\"\n", yytext);	return T_END; }
 "INTEGER"		{ printf("Found keyword \"%s\"\n", yytext);	return T_INTEGER; }
 "REAL"			{ printf("Found keyword \"%s\"\n", yytext);	return T_REAL; }
@@ -106,16 +108,28 @@ LCONST \.(TRUE|FALSE)\.
 {ICONST_B}		{ printf("Found integer: %ld as \"%s\"\n", GET_INT_VALUE(yytext, 2), yytext); return T_ICONST; }
 
  /* Rconst */
-{RCONST_D}		{ printf("Found real: %lf as \"%s\"\n", strtod(yytext), yytext); return T_RCONST; }
+{RCONST_D}		{ printf("Found real: %lf as \"%s\"\n", strtod(yytext, NULL), yytext); return T_RCONST; }
 {RCONST_H}		{ printf("Found real: %lf as \"%s\"\n", GET_REAL_VALUE(yytext, 16), yytext); return T_RCONST; }
 {RCONST_B}		{ printf("Found real: %lf as \"%s\"\n", GET_REAL_VALUE(yytext, 2), yytext); return T_RCONST; }
 
+
+ /* Operators */
+".AND."					{ printf("Found operator \"%s\"\n", yytext); return T_ANDOP; }
+".OR."					{ printf("Found operator \"%s\"\n", yytext); return T_OROP; }
+".NOT."					{ printf("Found operator \"%s\"\n", yytext); return T_NOTOP; }
+"."([GL][TE]|EQ|NE)"."	{ printf("Found operator \"%s\"\n", yytext); return T_RELOP; }
+"+"|"-"					{ printf("Found operator \"%s\"\n", yytext); return T_ADDOP; }
+"*"						{ printf("Found operator \"%s\"\n", yytext); return T_MULOP; }
+"/"						{ printf("Found operator \"%s\"\n", yytext); return T_DIVOP; }
+"**"					{ printf("Found operator \"%s\"\n", yytext); return T_POWEROP; }
 
 .				{printf("Unknown \"%s\"\n", yytext);}
 }
 %%
 /*------------ USER-CODE SECTION ------------*/
-double bintod(const char *str)
+
+/* Parse a binary real number */
+double bintod(char *str)
 {
 	long long int a, b;
 	char *ptr;
@@ -132,17 +146,19 @@ double bintod(const char *str)
 	return (a + ((double) b/pow(2,strlen(ptr))));
 }
 
-double hextod(const char *str)
+/* Parse a hexadecimal real number */
+double hextod(char *str)
 {
 	long long int a, b;
 	char *ptr;
+	char delim[] = ".";
 
 	//Extract the whole number part
-	ptr = strtok(str, ".");
+	ptr = strtok(str, delim);
 	a = strtoll(ptr, NULL, 16);
 
 	//Extract the fractional part
-	ptr = strtok(NULL, ".");
+	ptr = strtok(NULL, delim);
 	b = strtoll(ptr, NULL, 16);
 
 	//Calculate the decimal number
