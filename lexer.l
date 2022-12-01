@@ -54,6 +54,9 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 /* Logical Constant */
 LCONST \.(TRUE|FALSE)\.
 
+/* List Functions */
+LISTFUNC C(AD*|D+)R
+
 
 %%
  /*------------ RULES SECTION ---------------*/
@@ -122,6 +125,9 @@ LCONST \.(TRUE|FALSE)\.
 "*"						{ printf("Found operator \"%s\"\n", yytext); return T_MULOP; }
 "/"						{ printf("Found operator \"%s\"\n", yytext); return T_DIVOP; }
 "**"					{ printf("Found operator \"%s\"\n", yytext); return T_POWEROP; }
+
+/* List Functions */
+{LISTFUNC}		{ printf("Found list function: \"%s\"\n", yytext); return T_LISTFUNC; }
 
 .				{printf("Unknown \"%s\"\n", yytext);}
 }
