@@ -57,6 +57,8 @@ LCONST \.(TRUE|FALSE)\.
 /* Characters */
 CHARACTER '((([$-~]| ))|(\\[nftrbv]))'
 
+/* List Functions */
+LISTFUNC C(AD*|D+)R
 
 %%
  /*------------ RULES SECTION ---------------*/
@@ -129,6 +131,8 @@ CHARACTER '((([$-~]| ))|(\\[nftrbv]))'
 /* characters */
 {CHARACTER}            { printf("Found Character "%c"\n", yytext[1]);	return T_CHARACTER; }
 
+/* List Functions */
+{LISTFUNC}		{ printf("Found list function: \"%s\"\n", yytext); return T_LISTFUNC; }
 
 .				{printf("Unknown \"%s\"\n", yytext);}
 }
