@@ -54,6 +54,9 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 /* Logical Constant */
 LCONST \.(TRUE|FALSE)\.
 
+/* Characters */
+CHARACTER '((([$-~]| ))|(\\[nftrbv]))'
+
 
 %%
  /*------------ RULES SECTION ---------------*/
@@ -122,6 +125,10 @@ LCONST \.(TRUE|FALSE)\.
 "*"						{ printf("Found operator \"%s\"\n", yytext); return T_MULOP; }
 "/"						{ printf("Found operator \"%s\"\n", yytext); return T_DIVOP; }
 "**"					{ printf("Found operator \"%s\"\n", yytext); return T_POWEROP; }
+
+/* characters */
+{CHARACTER}            { printf("Found Character "%c"\n", yytext[1]);	return T_CHARACTER; }
+
 
 .				{printf("Unknown \"%s\"\n", yytext);}
 }
