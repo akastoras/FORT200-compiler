@@ -10,19 +10,25 @@
 	#define GET_INT_VALUE(text, base) (strtol(text + 2, NULL, base))
 	#define GET_REAL_VALUE(text, base) (base == 16 ? hextod(text): bintod(text))
 	
+	char string_buffer[2*MAX_STRING_LENGTH] = {0};
+	int string_buffer_length = 0;
+	char c;
+	char *ptr;
+
+	char *get_character(char *string, char *cdest);
 	double hextod(char *str);
 	double bintod(char *str);
+	void yyerror(const char *s);
 %}
 
 %option case-insensitive
 %option yylineno
 %option noyywrap
 
-%x COMMENT
+%x COMMENT CHARACTER STRING
 
 WHITECHAR	[ \t\v\n]
 
-DIGIT		[0-9]
 ALPHA		[a-z]
 ALNUM		[0-9a-z]
 ID			(_{ALPHA}((_?{ALNUM})+)*_)|({ALPHA}{ALNUM}*)
@@ -51,22 +57,29 @@ RCONST_B_1	({VALID_BNUM}|0)?\.([01]*1[01]*|0)
 RCONST_B_2	{VALID_BNUM}(\.(([01]*1[01]*)|0)?)?
 RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 
-/* Logical Constant */
-LCONST \.(TRUE|FALSE)\.
-
-
 
 %%
  /*------------ RULES SECTION ---------------*/
 
 
 <COMMENT>{
-\n		{ printf("End of COMMENT\n"); BEGIN(INITIAL);}
+\n				{ printf("End of COMMENT\n"); BEGIN(INITIAL);}
 [^\n]+
 }
 
+<CHARACTER>{
+""([" "-~]|\\[nftrbv])"'"	{ ptr = get_character(yytext, &c); printf("Found Character '%c'\n", c); BEGIN(INITIAL); return T_CHARACTER; }
+"'"							{ yyerror("Empty character constant"); BEGIN(INITIAL); }
+<<EOF>>						{ yyerror("End of file inside character constant"); }
+.*"'"						{ yyerror("Unexpected content of character constant"); BEGIN(INITIAL); }
+}
+
+<STRING>{
+
+}
+
 <INITIAL>{
-"$"			{ printf("Start of COMMENT\n"); BEGIN(COMMENT);}
+"$"				{ printf("Start of COMMENT\n"); BEGIN(COMMENT); }
 
 <<EOF>>			{ printf("Found EOF\n"); return T_EOF;}
 {WHITECHAR}		{}
@@ -100,9 +113,6 @@ LCONST \.(TRUE|FALSE)\.
 "STOP"			{ printf("Found keyword \"%s\"\n", yytext);	return T_STOP; }
 "RETURN"		{ printf("Found keyword \"%s\"\n", yytext);	return T_RETURN; }
 
- /* Identifier */
-{ID}			{ printf("Found id \"%s\"\n", yytext); }
-
  /* Iconst */
 {ICONST_D}		{ printf("Found integer: %d  as \"%s\"\n", atoi(yytext), yytext); return T_ICONST; }
 {ICONST_H}		{ printf("Found integer: %ld as \"%s\"\n", GET_INT_VALUE(yytext, 16), yytext); return T_ICONST; }
@@ -126,19 +136,79 @@ LCONST \.(TRUE|FALSE)\.
 
 
  /*Extra lexical units*/
-"\("				{printf("Found operator \"%s\"\n", yytext); return T_LPAREN; }
-"\)"				{printf("Found operator \"%s\"\n", yytext); return T_RPAREN; }
-","				{printf("Found operator \"%s\"\n", yytext); return T_COMMA; }
-"="				{printf("Found operator \"%s\"\n", yytext); return T_ASSIGN; }
-"."				{printf("Found operator \"%s\"\n", yytext); return T_DOT; }
-":"				{printf("Found operator \"%s\"\n", yytext); return T_COLON; }
-"\["				{printf("Found operator \"%s\"\n", yytext); return T_LBRACK; }
-"\]"				{printf("Found operator \"%s\"\n", yytext); return T_RBRACK; }					
+"("				{ printf("Found operator \"%s\"\n", yytext); return T_LPAREN; }
+")"				{ printf("Found operator \"%s\"\n", yytext); return T_RPAREN; }
+","				{ printf("Found operator \"%s\"\n", yytext); return T_COMMA; }
+"="				{ printf("Found operator \"%s\"\n", yytext); return T_ASSIGN; }
+"."				{ printf("Found operator \"%s\"\n", yytext); return T_DOT; }
+":"				{ printf("Found operator \"%s\"\n", yytext); return T_COLON; }
+"["				{ printf("Found operator \"%s\"\n", yytext); return T_LBRACK; }
+"]"				{ printf("Found operator \"%s\"\n", yytext); return T_RBRACK; }					
 
-.				{printf("Unknown \"%s\"\n", yytext);}
+ /* Characters */
+"'"				{ BEGIN(CHARACTER); }
+
+\"				{ BEGIN(STRING); }
+
+ /* List Functions */
+"C"(AD*|D+)"R"	{ printf("Found list function: \"%s\"\n", yytext); return T_LISTFUNC; }
+
+ /* Identifier */
+{ID}			{ printf("Found id \"%s\"\n", yytext); }
+
+.				{ yyerror("Unknown Character");}
 }
 %%
 /*------------ USER-CODE SECTION ------------*/
+
+/* next = get_character(string, &c); */
+char *get_character(char *string, char *cdest)
+{
+	if (string[0] == '\0') {
+		return NULL;
+	}
+	else if (string[0] != '\\') {
+		*cdest = string[0];
+		return string + 1;
+	}
+	else {
+		switch (string[1]) {
+			case 'n' : {
+				*cdest = '\n';
+				break;
+			}
+			case 'f' : {
+				*cdest = '\f';
+				break;
+			}
+			case 't' : {
+				*cdest = '\t';
+				break;
+			}
+			case 'r' : {
+				*cdest = '\r';
+				break;
+			}
+			case 'b' : {
+				*cdest = '\b';
+				break;
+			}
+			case 'v' : {
+				*cdest = '\v';
+				break;
+			}
+			case '\\' : {
+				*cdest = '\\';
+				break;
+			}
+			case '\"' : {
+				*cdest = '\"';
+				break;
+			}
+		}
+		return string + 2;
+	}
+}
 
 /* Parse a binary real number */
 double bintod(char *str)
@@ -177,6 +247,20 @@ double hextod(char *str)
 	return (a + ((double) b/pow(16,strlen(ptr))));
 }
 
+void yyerror(const char *s)
+{
+	static int errors = 0;
+	errors++;
+
+	printf("ERROR: %s in line %d\n", s, yylineno);
+
+	if (errors > 5) {
+		printf("%d errors encountered.\n", errors);
+		exit(1);
+	}
+}
+
+
 int main(int argc, char **argv)
 {
 	int token;
@@ -188,7 +272,7 @@ int main(int argc, char **argv)
 			return -1;
 		}
 	}
-
+	
 	do {
 		token = yylex();
 	} while (token != 0);
