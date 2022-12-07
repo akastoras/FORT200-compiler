@@ -5,16 +5,21 @@
 	#include <stdlib.h>
 	#include <unistd.h>
 	#include <string.h>
+	#include <errno.h>
 	#include <math.h>
-
+	#include <stdbool.h>
+	
 	#define GET_INT_VALUE(text, base) (strtol(text + 2, NULL, base))
 	#define GET_REAL_VALUE(text, base) (base == 16 ? hextod(text): bintod(text))
 	
 	char string_buffer[2*MAX_STRING_LENGTH] = {0};
+	const int string_buffer_size = 2*MAX_STRING_LENGTH;
 	int string_buffer_length = 0;
 	char c;
 	char *ptr;
 
+	char *end_string_wrapper();
+	bool read_string_part();
 	char *get_character(char *string, char *cdest);
 	double hextod(char *str);
 	double bintod(char *str);
@@ -75,7 +80,12 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 }
 
 <STRING>{
-
+([^"\\\n]|(\\[\"\\nftrbv]))+/\\\n	{ read_string_part(); }
+\\\n								{}
+([^"\\\n]|(\\[\"\\nftrbv]))+/\"		{ read_string_part(); }
+\"									{ printf("Found string \"%s\"\n", end_string_wrapper()); BEGIN(INITIAL); return T_STRING; }
+<<EOF>>								{ yyerror("End of file inside character constant"); }
+.									{ yyerror("Unexpected character inside string"); }
 }
 
 <INITIAL>{
@@ -161,10 +171,53 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 %%
 /*------------ USER-CODE SECTION ------------*/
 
+/* Reads string_buffer and creates final string, also clears string_buffer and string_buffer size */
+char *end_string_wrapper() {
+	int next_idx;
+	char *new_str, *ptr;
+	char c;
+
+	if (!(new_str = (char *)malloc(MAX_STRING_LENGTH * sizeof(char)))) {
+		perror("Error");
+		exit(EXIT_FAILURE);
+	}
+	
+	next_idx = 0;
+	ptr = string_buffer;
+	do {
+		ptr = get_character(ptr, &c);
+		new_str[next_idx++] = c;
+	} while(ptr != NULL);
+	
+	if (!(new_str = (char *)realloc(new_str, next_idx * sizeof(char)))) {
+		perror("Error");
+		exit(EXIT_FAILURE);
+	}
+
+	// Reset buffer
+	string_buffer[0] = '\0';
+	string_buffer_length = 0;
+
+	return new_str;
+}
+
+/* Appends the part of the string to string_buffer, returns true if success */
+bool read_string_part(void)
+{
+	if (strncat(string_buffer, yytext, string_buffer_size - string_buffer_length) != string_buffer) {
+		return false;
+	}
+	else {
+		string_buffer_length += strlen(yytext);
+		return true;
+	}
+}
+
 /* next = get_character(string, &c); */
 char *get_character(char *string, char *cdest)
 {
 	if (string[0] == '\0') {
+		*cdest = '\0';
 		return NULL;
 	}
 	else if (string[0] != '\\') {

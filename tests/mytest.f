@@ -1,19 +1,4 @@
-.GT.
-.GE.
-.LT.
-.LE.
-.EQ.
-.NE.
-.NQ.
+"One \"ring\" to \
+rule them all \
+Here is a \"\\n\"\n"
 
-CADDR
-
-'c'
-'\n'
-'$'
-'~'
-'4'
-'an'
-2/3
-
-while

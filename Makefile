@@ -12,8 +12,8 @@ lex.yy.c: $(LEXER)
 %.lexer.bin: lex.yy.c
 	gcc $(CFLAGS) $^ -o $@ $(LFLAGS)
 
-run:
-	./$(BIN) testfile.c
+run: all
+	./$(BIN) tests/test1.f
 
 clean:
 	rm *.lexer.bin *.yy.c
