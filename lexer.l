@@ -66,7 +66,7 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 %%
  /*------------ RULES SECTION ---------------*/
 
-
+ 
 <COMMENT>{
 \n				{ printf("End of COMMENT\n"); BEGIN(INITIAL);}
 [^\n]+
@@ -83,7 +83,7 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 ([^"\\\n]|(\\[\"\\nftrbv]))+/\\\n	{ read_string_part(); }
 \\\n								{}
 ([^"\\\n]|(\\[\"\\nftrbv]))+/\"		{ read_string_part(); }
-\"									{ printf("Found string \"%s\"\n", end_string_wrapper()); BEGIN(INITIAL); return T_STRING; }
+\"									{ printf("Found string \"%s\"\n, in line %d\n", end_string_wrapper(), yylineno); BEGIN(INITIAL); return T_STRING; }
 <<EOF>>								{ yyerror("End of file inside character constant"); }
 .									{ yyerror("Unexpected character inside string"); }
 }
@@ -95,65 +95,65 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 {WHITECHAR}		{}
 
  /* Keywords */
-"FUNCTION"		{ printf("Found keyword \"%s\"\n", yytext);	return T_FUNCTION; }
-"SUBROUTINE"	{ printf("Found keyword \"%s\"\n", yytext);	return T_SUBROUTINE; }
-"END"			{ printf("Found keyword \"%s\"\n", yytext);	return T_END; }
-"INTEGER"		{ printf("Found keyword \"%s\"\n", yytext);	return T_INTEGER; }
-"REAL"			{ printf("Found keyword \"%s\"\n", yytext);	return T_REAL; }
-"LOGICAL"		{ printf("Found keyword \"%s\"\n", yytext);	return T_LOGICAL; }
-"CHARACTER"		{ printf("Found keyword \"%s\"\n", yytext);	return T_CHARACTER; }
-"COMPLEX"		{ printf("Found keyword \"%s\"\n", yytext);	return T_COMPLEX; }
-"RECORD"		{ printf("Found keyword \"%s\"\n", yytext);	return T_RECORD; }
-"ENDREC"		{ printf("Found keyword \"%s\"\n", yytext);	return T_ENDREC; }
-"LIST"			{ printf("Found keyword \"%s\"\n", yytext);	return T_LIST; }  
-"DATA"			{ printf("Found keyword \"%s\"\n", yytext);	return T_DATA; }
-"CONTINUE"		{ printf("Found keyword \"%s\"\n", yytext);	return T_CONTINUE; }
-"GOTO"			{ printf("Found keyword \"%s\"\n", yytext);	return T_GOTO; }
-"CALL"			{ printf("Found keyword \"%s\"\n", yytext);	return T_CALL; }
-"READ"			{ printf("Found keyword \"%s\"\n", yytext);	return T_READ; }
-"WRITE"			{ printf("Found keyword \"%s\"\n", yytext);	return T_WRITE; }
-"NEW"			{ printf("Found keyword \"%s\"\n", yytext);	return T_NEW; }
-"LENGTH"		{ printf("Found keyword \"%s\"\n", yytext);	return T_LENGTH;}
-"IF"			{ printf("Found keyword \"%s\"\n", yytext);	return T_IF; }
-"THEN"			{ printf("Found keyword \"%s\"\n", yytext);	return T_THEN; }
-"ELSE"			{ printf("Found keyword \"%s\"\n", yytext);	return T_ELSE; }
-"ENDIF"			{ printf("Found keyword \"%s\"\n", yytext);	return T_ENDIF; }
-"DO"			{ printf("Found keyword \"%s\"\n", yytext);	return T_DO; }
-"ENDDO"			{ printf("Found keyword \"%s\"\n", yytext);	return T_ENDDO; }
-"STOP"			{ printf("Found keyword \"%s\"\n", yytext);	return T_STOP; }
-"RETURN"		{ printf("Found keyword \"%s\"\n", yytext);	return T_RETURN; }
+"FUNCTION"		{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_FUNCTION; }
+"SUBROUTINE"	{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_SUBROUTINE; }
+"END"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_END; }
+"INTEGER"		{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_INTEGER; }
+"REAL"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_REAL; }
+"LOGICAL"		{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_LOGICAL; }
+"CHARACTER"		{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_CHARACTER; }
+"COMPLEX"		{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_COMPLEX; }
+"RECORD"		{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_RECORD; }
+"ENDREC"		{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_ENDREC; }
+"LIST"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_LIST; }  
+"DATA"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_DATA; }
+"CONTINUE"		{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_CONTINUE; }
+"GOTO"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_GOTO; }
+"CALL"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_CALL; }
+"READ"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_READ; }
+"WRITE"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_WRITE; }
+"NEW"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_NEW; }
+"LENGTH"		{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_LENGTH;}
+"IF"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_IF; }
+"THEN"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_THEN; }
+"ELSE"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_ELSE; }
+"ENDIF"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_ENDIF; }
+"DO"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_DO; }
+"ENDDO"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_ENDDO; }
+"STOP"			{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_STOP; }
+"RETURN"		{ printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);	return T_RETURN; }
 
  /* Iconst */
-{ICONST_D}		{ printf("Found integer: %d  as \"%s\"\n", atoi(yytext), yytext); return T_ICONST; }
-{ICONST_H}		{ printf("Found integer: %ld as \"%s\"\n", GET_INT_VALUE(yytext, 16), yytext); return T_ICONST; }
-{ICONST_B}		{ printf("Found integer: %ld as \"%s\"\n", GET_INT_VALUE(yytext, 2), yytext); return T_ICONST; }
+{ICONST_D}		{ printf("Found integer: %d  as \"%s\", in line %d\n", atoi(yytext), yytext, yylineno); return T_ICONST; }
+{ICONST_H}		{ printf("Found integer: %ld as \"%s\", in line %d\n", GET_INT_VALUE(yytext, 16), yytext, yylineno); return T_ICONST; }
+{ICONST_B}		{ printf("Found integer: %ld as \"%s\", in line %d\n", GET_INT_VALUE(yytext, 2), yytext, yylineno); return T_ICONST; }
 
  /* Rconst */
-{RCONST_D}		{ printf("Found real: %lf as \"%s\"\n", strtod(yytext, NULL), yytext); return T_RCONST; }
-{RCONST_H}		{ printf("Found real: %lf as \"%s\"\n", GET_REAL_VALUE(yytext, 16), yytext); return T_RCONST; }
-{RCONST_B}		{ printf("Found real: %lf as \"%s\"\n", GET_REAL_VALUE(yytext, 2), yytext); return T_RCONST; }
+{RCONST_D}		{ printf("Found real: %lf as \"%s\", in line %d\n", strtod(yytext, NULL), yytext, yylineno); return T_RCONST; }
+{RCONST_H}		{ printf("Found real: %lf as \"%s\", in line %d\n", GET_REAL_VALUE(yytext, 16), yytext, yylineno); return T_RCONST; }
+{RCONST_B}		{ printf("Found real: %lf as \"%s\", in line %d\n", GET_REAL_VALUE(yytext, 2), yytext, yylineno); return T_RCONST; }
 
 
  /* Operators */
-".AND."					{ printf("Found operator \"%s\"\n", yytext); return T_ANDOP; }
-".OR."					{ printf("Found operator \"%s\"\n", yytext); return T_OROP; }
-".NOT."					{ printf("Found operator \"%s\"\n", yytext); return T_NOTOP; }
-"."([GL][TE]|EQ|NE)"."	{ printf("Found operator \"%s\"\n", yytext); return T_RELOP; }
-"+"|"-"					{ printf("Found operator \"%s\"\n", yytext); return T_ADDOP; }
-"*"						{ printf("Found operator \"%s\"\n", yytext); return T_MULOP; }
-"/"						{ printf("Found operator \"%s\"\n", yytext); return T_DIVOP; }
-"**"					{ printf("Found operator \"%s\"\n", yytext); return T_POWEROP; }
+".AND."					{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_ANDOP; }
+".OR."					{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_OROP; }
+".NOT."					{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_NOTOP; }
+"."([GL][TE]|EQ|NE)"."	{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_RELOP; }
+"+"|"-"					{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_ADDOP; }
+"*"						{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_MULOP; }
+"/"						{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_DIVOP; }
+"**"					{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_POWEROP; }
 
 
  /*Extra lexical units*/
-"("				{ printf("Found operator \"%s\"\n", yytext); return T_LPAREN; }
-")"				{ printf("Found operator \"%s\"\n", yytext); return T_RPAREN; }
-","				{ printf("Found operator \"%s\"\n", yytext); return T_COMMA; }
-"="				{ printf("Found operator \"%s\"\n", yytext); return T_ASSIGN; }
-"."				{ printf("Found operator \"%s\"\n", yytext); return T_DOT; }
-":"				{ printf("Found operator \"%s\"\n", yytext); return T_COLON; }
-"["				{ printf("Found operator \"%s\"\n", yytext); return T_LBRACK; }
-"]"				{ printf("Found operator \"%s\"\n", yytext); return T_RBRACK; }					
+"("				{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_LPAREN; }
+")"				{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_RPAREN; }
+","				{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_COMMA; }
+"="				{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_ASSIGN; }
+"."				{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_DOT; }
+":"				{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_COLON; }
+"["				{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_LBRACK; }
+"]"				{ printf("Found operator \"%s\", in line %d\n", yytext, yylineno); return T_RBRACK; }					
 
  /* Characters */
 "'"				{ BEGIN(CHARACTER); }
@@ -161,17 +161,17 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 \"				{ BEGIN(STRING); }
 
  /* List Functions */
-"C"(AD*|D+)"R"	{ printf("Found list function: \"%s\"\n", yytext); return T_LISTFUNC; }
+"C"(AD*|D+)"R"	{ printf("Found list function: \"%s\", in line %d\n", yytext, yylineno); return T_LISTFUNC; }
 
  /* Identifier */
-{ID}			{ printf("Found id \"%s\"\n", yytext); }
+{ID}			{ printf("Found id \"%s\"\n, in line %d\n", yytext, yylineno); }
 
 .				{ yyerror("Unknown Character");}
 }
 %%
 /*------------ USER-CODE SECTION ------------*/
 
-/* Reads string_buffer and creates final string, also clears string_buffer and string_buffer size */
+/* Reads string_buffer and creates final string, also clears string_buffer and string_buffer_length */
 char *end_string_wrapper() {
 	int next_idx;
 	char *new_str, *ptr;
@@ -326,6 +326,7 @@ int main(int argc, char **argv)
 		}
 	}
 	
+	printf("Start of lexer\n");
 	do {
 		token = yylex();
 	} while (token != 0);
