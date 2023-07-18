@@ -1,6 +1,6 @@
 /*------------ DECLARATION SECTION ------------*/
 %{
-	#include "lexer.h"
+	// #include "lexer.h"
 	#include <stdio.h>
 	#include <stdlib.h>
 	#include <unistd.h>
@@ -8,9 +8,11 @@
 	#include <errno.h>
 	#include <math.h>
 	#include <stdbool.h>
+	#include "syntax.tab.h"
 	
 	#define GET_INT_VALUE(text, base) (strtol(text + 2, NULL, base))
 	#define GET_REAL_VALUE(text, base) (base == 16 ? hextod(text): bintod(text))
+	#define MAX_STRING_LENGTH (2048)
 	
 	char string_buffer[2*MAX_STRING_LENGTH] = {0};
 	const int string_buffer_size = 2*MAX_STRING_LENGTH;
@@ -314,7 +316,7 @@ void yyerror(const char *s)
 }
 
 
-int main(int argc, char **argv)
+/* int main(int argc, char **argv)
 {
 	int token;
 
@@ -333,4 +335,4 @@ int main(int argc, char **argv)
 
 	fclose(yyin);
 	yyterminate();
-}
+} */

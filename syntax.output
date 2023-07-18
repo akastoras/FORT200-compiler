@@ -1,0 +1,3402 @@
+State 101 conflicts: 7 shift/reduce
+State 102 conflicts: 7 shift/reduce
+State 149 conflicts: 7 shift/reduce
+State 150 conflicts: 7 shift/reduce
+State 151 conflicts: 7 shift/reduce
+State 152 conflicts: 7 shift/reduce
+State 153 conflicts: 7 shift/reduce
+State 154 conflicts: 7 shift/reduce
+State 155 conflicts: 7 shift/reduce
+
+
+Grammar
+
+    0 $accept: program "EOF"
+
+    1 program: body "end" subprograms
+
+    2 body: declarations statements
+
+    3 declarations: declarations type vars
+    4             | declarations "record" fields "endrec" vars
+    5             | declarations "data" vals
+    6             | %empty
+
+    7 type: "int"
+    8     | "real"
+    9     | "logical"
+   10     | "char"
+   11     | "complex"
+
+   12 vars: vars "comma" undef_variable
+   13     | undef_variable
+
+   14 undef_variable: "list" undef_variable
+   15               | "id" "lparen" dims "rparen"
+   16               | "id"
+
+   17 dims: dims "comma" dim
+   18     | dim
+
+   19 dim: "iconst"
+   20    | "id"
+
+   21 fields: fields field
+   22       | field
+
+   23 field: type vars
+   24      | "record" fields "endrec" vars
+
+   25 vals: vals "comma" "id" value_list
+   26     | "id" value_list
+
+   27 value_list: "divop" values "divop"
+
+   28 values: values "comma" value
+   29       | value
+
+   30 value: sign constant
+   31      | "string"
+
+   32 sign: "addop"
+   33     | %empty
+
+   34 constant: simple_constant
+   35         | complex_constant
+
+   36 simple_constant: "iconst"
+   37                | "rconst"
+   38                | "lconst"
+   39                | "cconst"
+
+   40 complex_constant: "lparen" "rconst" "colon" sign "rconst" "rparen"
+
+   41 statements: statements labeled_statement
+   42           | labeled_statement
+
+   43 labeled_statement: label statement
+   44                  | statement
+
+   45 label: "iconst"
+
+   46 statement: simple_statement
+   47          | compound_statement
+
+   48 simple_statement: assignment
+   49                 | goto_statement
+   50                 | if_statement
+   51                 | subroutine_call
+   52                 | io_statement
+   53                 | "continue"
+   54                 | "return"
+   55                 | "stop"
+
+   56 assignment: variable "assign" expression
+   57           | variable "assign" "string"
+
+   58 variable: variable "dot" "id"
+   59         | variable "lparen" expressions "rparen"
+   60         | "listfunc" "lparen" expression "rparen"
+   61         | "id"
+
+   62 expressions: expressions "comma" expression
+   63            | expression
+
+   64 expression: expression "orop" expression
+   65           | expression "andop" expression
+   66           | expression "relop" expression
+   67           | expression "addop" expression
+   68           | expression "mulop" expression
+   69           | expression "divop" expression
+   70           | expression "powerop" expression
+   71           | "notop" expression
+   72           | "addop" expression
+   73           | variable
+   74           | simple_constant
+   75           | "length" "lparen" expression "rparen"
+   76           | "new" "lparen" expression "rparen"
+   77           | "lparen" expression "rparen"
+   78           | "lparen" expression "colon" expression "rparen"
+   79           | listexpression
+
+   80 listexpression: "lbrack" expressions "rbrack"
+   81               | "lbrack" "rbrack"
+
+   82 goto_statement: "goto" label
+   83               | "goto" "id" "comma" "lparen" labels "rparen"
+
+   84 labels: labels "comma" label
+   85       | label
+
+   86 if_statement: "if" "lparen" expression "rparen" label "comma" label "comma" label
+   87             | "if" "lparen" expression "rparen" simple_statement
+
+   88 subroutine_call: "call" variable
+
+   89 io_statement: "read" read_list
+   90             | "write" write_list
+
+   91 read_list: read_list "comma" read_item
+   92          | read_item
+
+   93 read_item: variable
+   94          | "lparen" read_list "comma" "id" "assign" iter_space "rparen"
+
+   95 iter_space: expression "comma" expression step
+
+   96 step: "comma" expression
+   97     | %empty
+
+   98 write_list: write_list "comma" write_item
+   99           | write_item
+
+  100 write_item: expression
+  101           | "lparen" write_list "comma" "id" "assign" iter_space "rparen"
+  102           | "string"
+
+  103 compound_statement: branch_statement
+  104                   | loop_statement
+
+  105 branch_statement: "if" "lparen" expression "rparen" "then" body tail
+
+  106 tail: "else" body "endif"
+  107     | "endif"
+
+  108 loop_statement: "do" "id" "assign" iter_space body "enddo"
+
+  109 subprograms: subprograms subprogram
+  110            | %empty
+
+  111 subprogram: header body "end"
+
+  112 header: type "function" "id" "lparen" formal_parameters "rparen"
+  113       | "list" "function" "id" "lparen" formal_parameters "rparen"
+  114       | "subroutine" "id" "lparen" formal_parameters "rparen"
+  115       | "subroutine" "id"
+
+  116 formal_parameters: type vars "comma" formal_parameters
+  117                  | type vars
+
+
+Terminals, with rules where they appear
+
+    "EOF" (0) 0
+    error (256)
+    "function" (258) 112 113
+    "subroutine" (259) 114 115
+    "end" (260) 1 111
+    "int" (261) 7
+    "real" (262) 8
+    "logical" (263) 9
+    "char" (264) 10
+    "complex" (265) 11
+    "record" (266) 4 24
+    "endrec" (267) 4 24
+    "list" (268) 14 113
+    "data" (269) 5
+    "continue" (270) 53
+    "goto" (271) 82 83
+    "call" (272) 88
+    "read" (273) 89
+    "write" (274) 90
+    "new" (275) 76
+    "length" (276) 75
+    "if" (277) 86 87 105
+    "then" (278) 105
+    "else" (279) 106
+    "endif" (280) 106 107
+    "do" (281) 108
+    "enddo" (282) 108
+    "stop" (283) 55
+    "return" (284) 54
+    "id" (285) 15 16 20 25 26 58 61 83 94 101 108 112 113 114 115
+    "iconst" <intval> (286) 19 36 45
+    "rconst" <rval> (287) 37 40
+    "lconst" <lval> (288) 38
+    "cconst" <charval> (289) 39
+    "orop" (290) 64
+    "andop" (291) 65
+    "notop" (292) 71
+    "relop" (293) 66
+    "addop" (294) 32 67 72
+    "mulop" (295) 68
+    "divop" (296) 27 69
+    "powerop" (297) 70
+    "listfunc" (298) 60
+    "string" <strval> (299) 31 57 102
+    "lparen" (300) 15 40 59 60 75 76 77 78 83 86 87 94 101 105 112 113 114
+    "rparen" (301) 15 40 59 60 75 76 77 78 83 86 87 94 101 105 112 113 114
+    "comma" (302) 12 17 25 28 62 83 84 86 91 94 95 96 98 101 116
+    "assign" (303) 56 57 94 101 108
+    "dot" (304) 58
+    "colon" (305) 40 78
+    "lbrack" (306) 80 81
+    "rbrack" (307) 80 81
+
+
+Nonterminals, with rules where they appear
+
+    $accept (53)
+        on left: 0
+    program (54)
+        on left: 1
+        on right: 0
+    body (55)
+        on left: 2
+        on right: 1 105 106 108 111
+    declarations (56)
+        on left: 3 4 5 6
+        on right: 2 3 4 5
+    type (57)
+        on left: 7 8 9 10 11
+        on right: 3 23 112 116 117
+    vars (58)
+        on left: 12 13
+        on right: 3 4 12 23 24 116 117
+    undef_variable (59)
+        on left: 14 15 16
+        on right: 12 13 14
+    dims (60)
+        on left: 17 18
+        on right: 15 17
+    dim (61)
+        on left: 19 20
+        on right: 17 18
+    fields (62)
+        on left: 21 22
+        on right: 4 21 24
+    field (63)
+        on left: 23 24
+        on right: 21 22
+    vals (64)
+        on left: 25 26
+        on right: 5 25
+    value_list (65)
+        on left: 27
+        on right: 25 26
+    values (66)
+        on left: 28 29
+        on right: 27 28
+    value (67)
+        on left: 30 31
+        on right: 28 29
+    sign (68)
+        on left: 32 33
+        on right: 30 40
+    constant (69)
+        on left: 34 35
+        on right: 30
+    simple_constant (70)
+        on left: 36 37 38 39
+        on right: 34 74
+    complex_constant (71)
+        on left: 40
+        on right: 35
+    statements (72)
+        on left: 41 42
+        on right: 2 41
+    labeled_statement (73)
+        on left: 43 44
+        on right: 41 42
+    label (74)
+        on left: 45
+        on right: 43 82 84 85 86
+    statement (75)
+        on left: 46 47
+        on right: 43 44
+    simple_statement (76)
+        on left: 48 49 50 51 52 53 54 55
+        on right: 46 87
+    assignment (77)
+        on left: 56 57
+        on right: 48
+    variable (78)
+        on left: 58 59 60 61
+        on right: 56 57 58 59 73 88 93
+    expressions (79)
+        on left: 62 63
+        on right: 59 62 80
+    expression (80)
+        on left: 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79
+        on right: 56 60 62 63 64 65 66 67 68 69 70 71 72 75 76 77 78 86 87 95 96 100 105
+    listexpression (81)
+        on left: 80 81
+        on right: 79
+    goto_statement (82)
+        on left: 82 83
+        on right: 49
+    labels (83)
+        on left: 84 85
+        on right: 83 84
+    if_statement (84)
+        on left: 86 87
+        on right: 50
+    subroutine_call (85)
+        on left: 88
+        on right: 51
+    io_statement (86)
+        on left: 89 90
+        on right: 52
+    read_list (87)
+        on left: 91 92
+        on right: 89 91 94
+    read_item (88)
+        on left: 93 94
+        on right: 91 92
+    iter_space (89)
+        on left: 95
+        on right: 94 101 108
+    step (90)
+        on left: 96 97
+        on right: 95
+    write_list (91)
+        on left: 98 99
+        on right: 90 98 101
+    write_item (92)
+        on left: 100 101 102
+        on right: 98 99
+    compound_statement (93)
+        on left: 103 104
+        on right: 47
+    branch_statement (94)
+        on left: 105
+        on right: 103
+    tail (95)
+        on left: 106 107
+        on right: 105
+    loop_statement (96)
+        on left: 108
+        on right: 104
+    subprograms (97)
+        on left: 109 110
+        on right: 1 109
+    subprogram (98)
+        on left: 111
+        on right: 109
+    header (99)
+        on left: 112 113 114 115
+        on right: 111
+    formal_parameters (100)
+        on left: 116 117
+        on right: 112 113 114 116
+
+
+State 0
+
+    0 $accept: . program "EOF"
+
+    $default  reduce using rule 6 (declarations)
+
+    program       go to state 1
+    body          go to state 2
+    declarations  go to state 3
+
+
+State 1
+
+    0 $accept: program . "EOF"
+
+    "EOF"  shift, and go to state 4
+
+
+State 2
+
+    1 program: body . "end" subprograms
+
+    "end"  shift, and go to state 5
+
+
+State 3
+
+    2 body: declarations . statements
+    3 declarations: declarations . type vars
+    4             | declarations . "record" fields "endrec" vars
+    5             | declarations . "data" vals
+
+    "int"       shift, and go to state 6
+    "real"      shift, and go to state 7
+    "logical"   shift, and go to state 8
+    "char"      shift, and go to state 9
+    "complex"   shift, and go to state 10
+    "record"    shift, and go to state 11
+    "data"      shift, and go to state 12
+    "continue"  shift, and go to state 13
+    "goto"      shift, and go to state 14
+    "call"      shift, and go to state 15
+    "read"      shift, and go to state 16
+    "write"     shift, and go to state 17
+    "if"        shift, and go to state 18
+    "do"        shift, and go to state 19
+    "stop"      shift, and go to state 20
+    "return"    shift, and go to state 21
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 23
+    "listfunc"  shift, and go to state 24
+
+    type                go to state 25
+    statements          go to state 26
+    labeled_statement   go to state 27
+    label               go to state 28
+    statement           go to state 29
+    simple_statement    go to state 30
+    assignment          go to state 31
+    variable            go to state 32
+    goto_statement      go to state 33
+    if_statement        go to state 34
+    subroutine_call     go to state 35
+    io_statement        go to state 36
+    compound_statement  go to state 37
+    branch_statement    go to state 38
+    loop_statement      go to state 39
+
+
+State 4
+
+    0 $accept: program "EOF" .
+
+    $default  accept
+
+
+State 5
+
+    1 program: body "end" . subprograms
+
+    $default  reduce using rule 110 (subprograms)
+
+    subprograms  go to state 40
+
+
+State 6
+
+    7 type: "int" .
+
+    $default  reduce using rule 7 (type)
+
+
+State 7
+
+    8 type: "real" .
+
+    $default  reduce using rule 8 (type)
+
+
+State 8
+
+    9 type: "logical" .
+
+    $default  reduce using rule 9 (type)
+
+
+State 9
+
+   10 type: "char" .
+
+    $default  reduce using rule 10 (type)
+
+
+State 10
+
+   11 type: "complex" .
+
+    $default  reduce using rule 11 (type)
+
+
+State 11
+
+    4 declarations: declarations "record" . fields "endrec" vars
+
+    "int"      shift, and go to state 6
+    "real"     shift, and go to state 7
+    "logical"  shift, and go to state 8
+    "char"     shift, and go to state 9
+    "complex"  shift, and go to state 10
+    "record"   shift, and go to state 41
+
+    type    go to state 42
+    fields  go to state 43
+    field   go to state 44
+
+
+State 12
+
+    5 declarations: declarations "data" . vals
+
+    "id"  shift, and go to state 45
+
+    vals  go to state 46
+
+
+State 13
+
+   53 simple_statement: "continue" .
+
+    $default  reduce using rule 53 (simple_statement)
+
+
+State 14
+
+   82 goto_statement: "goto" . label
+   83               | "goto" . "id" "comma" "lparen" labels "rparen"
+
+    "id"      shift, and go to state 47
+    "iconst"  shift, and go to state 23
+
+    label  go to state 48
+
+
+State 15
+
+   88 subroutine_call: "call" . variable
+
+    "id"        shift, and go to state 22
+    "listfunc"  shift, and go to state 24
+
+    variable  go to state 49
+
+
+State 16
+
+   89 io_statement: "read" . read_list
+
+    "id"        shift, and go to state 22
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 50
+
+    variable   go to state 51
+    read_list  go to state 52
+    read_item  go to state 53
+
+
+State 17
+
+   90 io_statement: "write" . write_list
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "string"    shift, and go to state 62
+    "lparen"    shift, and go to state 63
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 67
+    listexpression   go to state 68
+    write_list       go to state 69
+    write_item       go to state 70
+
+
+State 18
+
+   86 if_statement: "if" . "lparen" expression "rparen" label "comma" label "comma" label
+   87             | "if" . "lparen" expression "rparen" simple_statement
+  105 branch_statement: "if" . "lparen" expression "rparen" "then" body tail
+
+    "lparen"  shift, and go to state 71
+
+
+State 19
+
+  108 loop_statement: "do" . "id" "assign" iter_space body "enddo"
+
+    "id"  shift, and go to state 72
+
+
+State 20
+
+   55 simple_statement: "stop" .
+
+    $default  reduce using rule 55 (simple_statement)
+
+
+State 21
+
+   54 simple_statement: "return" .
+
+    $default  reduce using rule 54 (simple_statement)
+
+
+State 22
+
+   61 variable: "id" .
+
+    $default  reduce using rule 61 (variable)
+
+
+State 23
+
+   45 label: "iconst" .
+
+    $default  reduce using rule 45 (label)
+
+
+State 24
+
+   60 variable: "listfunc" . "lparen" expression "rparen"
+
+    "lparen"  shift, and go to state 73
+
+
+State 25
+
+    3 declarations: declarations type . vars
+
+    "list"  shift, and go to state 74
+    "id"    shift, and go to state 75
+
+    vars            go to state 76
+    undef_variable  go to state 77
+
+
+State 26
+
+    2 body: declarations statements .
+   41 statements: statements . labeled_statement
+
+    "continue"  shift, and go to state 13
+    "goto"      shift, and go to state 14
+    "call"      shift, and go to state 15
+    "read"      shift, and go to state 16
+    "write"     shift, and go to state 17
+    "if"        shift, and go to state 18
+    "do"        shift, and go to state 19
+    "stop"      shift, and go to state 20
+    "return"    shift, and go to state 21
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 23
+    "listfunc"  shift, and go to state 24
+
+    $default  reduce using rule 2 (body)
+
+    labeled_statement   go to state 78
+    label               go to state 28
+    statement           go to state 29
+    simple_statement    go to state 30
+    assignment          go to state 31
+    variable            go to state 32
+    goto_statement      go to state 33
+    if_statement        go to state 34
+    subroutine_call     go to state 35
+    io_statement        go to state 36
+    compound_statement  go to state 37
+    branch_statement    go to state 38
+    loop_statement      go to state 39
+
+
+State 27
+
+   42 statements: labeled_statement .
+
+    $default  reduce using rule 42 (statements)
+
+
+State 28
+
+   43 labeled_statement: label . statement
+
+    "continue"  shift, and go to state 13
+    "goto"      shift, and go to state 14
+    "call"      shift, and go to state 15
+    "read"      shift, and go to state 16
+    "write"     shift, and go to state 17
+    "if"        shift, and go to state 18
+    "do"        shift, and go to state 19
+    "stop"      shift, and go to state 20
+    "return"    shift, and go to state 21
+    "id"        shift, and go to state 22
+    "listfunc"  shift, and go to state 24
+
+    statement           go to state 79
+    simple_statement    go to state 30
+    assignment          go to state 31
+    variable            go to state 32
+    goto_statement      go to state 33
+    if_statement        go to state 34
+    subroutine_call     go to state 35
+    io_statement        go to state 36
+    compound_statement  go to state 37
+    branch_statement    go to state 38
+    loop_statement      go to state 39
+
+
+State 29
+
+   44 labeled_statement: statement .
+
+    $default  reduce using rule 44 (labeled_statement)
+
+
+State 30
+
+   46 statement: simple_statement .
+
+    $default  reduce using rule 46 (statement)
+
+
+State 31
+
+   48 simple_statement: assignment .
+
+    $default  reduce using rule 48 (simple_statement)
+
+
+State 32
+
+   56 assignment: variable . "assign" expression
+   57           | variable . "assign" "string"
+   58 variable: variable . "dot" "id"
+   59         | variable . "lparen" expressions "rparen"
+
+    "lparen"  shift, and go to state 80
+    "assign"  shift, and go to state 81
+    "dot"     shift, and go to state 82
+
+
+State 33
+
+   49 simple_statement: goto_statement .
+
+    $default  reduce using rule 49 (simple_statement)
+
+
+State 34
+
+   50 simple_statement: if_statement .
+
+    $default  reduce using rule 50 (simple_statement)
+
+
+State 35
+
+   51 simple_statement: subroutine_call .
+
+    $default  reduce using rule 51 (simple_statement)
+
+
+State 36
+
+   52 simple_statement: io_statement .
+
+    $default  reduce using rule 52 (simple_statement)
+
+
+State 37
+
+   47 statement: compound_statement .
+
+    $default  reduce using rule 47 (statement)
+
+
+State 38
+
+  103 compound_statement: branch_statement .
+
+    $default  reduce using rule 103 (compound_statement)
+
+
+State 39
+
+  104 compound_statement: loop_statement .
+
+    $default  reduce using rule 104 (compound_statement)
+
+
+State 40
+
+    1 program: body "end" subprograms .
+  109 subprograms: subprograms . subprogram
+
+    "subroutine"  shift, and go to state 83
+    "int"         shift, and go to state 6
+    "real"        shift, and go to state 7
+    "logical"     shift, and go to state 8
+    "char"        shift, and go to state 9
+    "complex"     shift, and go to state 10
+    "list"        shift, and go to state 84
+
+    $default  reduce using rule 1 (program)
+
+    type        go to state 85
+    subprogram  go to state 86
+    header      go to state 87
+
+
+State 41
+
+   24 field: "record" . fields "endrec" vars
+
+    "int"      shift, and go to state 6
+    "real"     shift, and go to state 7
+    "logical"  shift, and go to state 8
+    "char"     shift, and go to state 9
+    "complex"  shift, and go to state 10
+    "record"   shift, and go to state 41
+
+    type    go to state 42
+    fields  go to state 88
+    field   go to state 44
+
+
+State 42
+
+   23 field: type . vars
+
+    "list"  shift, and go to state 74
+    "id"    shift, and go to state 75
+
+    vars            go to state 89
+    undef_variable  go to state 77
+
+
+State 43
+
+    4 declarations: declarations "record" fields . "endrec" vars
+   21 fields: fields . field
+
+    "int"      shift, and go to state 6
+    "real"     shift, and go to state 7
+    "logical"  shift, and go to state 8
+    "char"     shift, and go to state 9
+    "complex"  shift, and go to state 10
+    "record"   shift, and go to state 41
+    "endrec"   shift, and go to state 90
+
+    type   go to state 42
+    field  go to state 91
+
+
+State 44
+
+   22 fields: field .
+
+    $default  reduce using rule 22 (fields)
+
+
+State 45
+
+   26 vals: "id" . value_list
+
+    "divop"  shift, and go to state 92
+
+    value_list  go to state 93
+
+
+State 46
+
+    5 declarations: declarations "data" vals .
+   25 vals: vals . "comma" "id" value_list
+
+    "comma"  shift, and go to state 94
+
+    $default  reduce using rule 5 (declarations)
+
+
+State 47
+
+   83 goto_statement: "goto" "id" . "comma" "lparen" labels "rparen"
+
+    "comma"  shift, and go to state 95
+
+
+State 48
+
+   82 goto_statement: "goto" label .
+
+    $default  reduce using rule 82 (goto_statement)
+
+
+State 49
+
+   58 variable: variable . "dot" "id"
+   59         | variable . "lparen" expressions "rparen"
+   88 subroutine_call: "call" variable .
+
+    "lparen"  shift, and go to state 80
+    "dot"     shift, and go to state 82
+
+    $default  reduce using rule 88 (subroutine_call)
+
+
+State 50
+
+   94 read_item: "lparen" . read_list "comma" "id" "assign" iter_space "rparen"
+
+    "id"        shift, and go to state 22
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 50
+
+    variable   go to state 51
+    read_list  go to state 96
+    read_item  go to state 53
+
+
+State 51
+
+   58 variable: variable . "dot" "id"
+   59         | variable . "lparen" expressions "rparen"
+   93 read_item: variable .
+
+    "lparen"  shift, and go to state 80
+    "dot"     shift, and go to state 82
+
+    $default  reduce using rule 93 (read_item)
+
+
+State 52
+
+   89 io_statement: "read" read_list .
+   91 read_list: read_list . "comma" read_item
+
+    "comma"  shift, and go to state 97
+
+    $default  reduce using rule 89 (io_statement)
+
+
+State 53
+
+   92 read_list: read_item .
+
+    $default  reduce using rule 92 (read_list)
+
+
+State 54
+
+   76 expression: "new" . "lparen" expression "rparen"
+
+    "lparen"  shift, and go to state 98
+
+
+State 55
+
+   75 expression: "length" . "lparen" expression "rparen"
+
+    "lparen"  shift, and go to state 99
+
+
+State 56
+
+   36 simple_constant: "iconst" .
+
+    $default  reduce using rule 36 (simple_constant)
+
+
+State 57
+
+   37 simple_constant: "rconst" .
+
+    $default  reduce using rule 37 (simple_constant)
+
+
+State 58
+
+   38 simple_constant: "lconst" .
+
+    $default  reduce using rule 38 (simple_constant)
+
+
+State 59
+
+   39 simple_constant: "cconst" .
+
+    $default  reduce using rule 39 (simple_constant)
+
+
+State 60
+
+   71 expression: "notop" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 101
+    listexpression   go to state 68
+
+
+State 61
+
+   72 expression: "addop" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 102
+    listexpression   go to state 68
+
+
+State 62
+
+  102 write_item: "string" .
+
+    $default  reduce using rule 102 (write_item)
+
+
+State 63
+
+   77 expression: "lparen" . expression "rparen"
+   78           | "lparen" . expression "colon" expression "rparen"
+  101 write_item: "lparen" . write_list "comma" "id" "assign" iter_space "rparen"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "string"    shift, and go to state 62
+    "lparen"    shift, and go to state 63
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 103
+    listexpression   go to state 68
+    write_list       go to state 104
+    write_item       go to state 70
+
+
+State 64
+
+   80 listexpression: "lbrack" . expressions "rbrack"
+   81               | "lbrack" . "rbrack"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+    "rbrack"    shift, and go to state 105
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expressions      go to state 106
+    expression       go to state 107
+    listexpression   go to state 68
+
+
+State 65
+
+   74 expression: simple_constant .
+
+    $default  reduce using rule 74 (expression)
+
+
+State 66
+
+   58 variable: variable . "dot" "id"
+   59         | variable . "lparen" expressions "rparen"
+   73 expression: variable .
+
+    "lparen"  shift, and go to state 80
+    "dot"     shift, and go to state 82
+
+    $default  reduce using rule 73 (expression)
+
+
+State 67
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+  100 write_item: expression .
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    $default  reduce using rule 100 (write_item)
+
+
+State 68
+
+   79 expression: listexpression .
+
+    $default  reduce using rule 79 (expression)
+
+
+State 69
+
+   90 io_statement: "write" write_list .
+   98 write_list: write_list . "comma" write_item
+
+    "comma"  shift, and go to state 115
+
+    $default  reduce using rule 90 (io_statement)
+
+
+State 70
+
+   99 write_list: write_item .
+
+    $default  reduce using rule 99 (write_list)
+
+
+State 71
+
+   86 if_statement: "if" "lparen" . expression "rparen" label "comma" label "comma" label
+   87             | "if" "lparen" . expression "rparen" simple_statement
+  105 branch_statement: "if" "lparen" . expression "rparen" "then" body tail
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 116
+    listexpression   go to state 68
+
+
+State 72
+
+  108 loop_statement: "do" "id" . "assign" iter_space body "enddo"
+
+    "assign"  shift, and go to state 117
+
+
+State 73
+
+   60 variable: "listfunc" "lparen" . expression "rparen"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 118
+    listexpression   go to state 68
+
+
+State 74
+
+   14 undef_variable: "list" . undef_variable
+
+    "list"  shift, and go to state 74
+    "id"    shift, and go to state 75
+
+    undef_variable  go to state 119
+
+
+State 75
+
+   15 undef_variable: "id" . "lparen" dims "rparen"
+   16               | "id" .
+
+    "lparen"  shift, and go to state 120
+
+    $default  reduce using rule 16 (undef_variable)
+
+
+State 76
+
+    3 declarations: declarations type vars .
+   12 vars: vars . "comma" undef_variable
+
+    "comma"  shift, and go to state 121
+
+    $default  reduce using rule 3 (declarations)
+
+
+State 77
+
+   13 vars: undef_variable .
+
+    $default  reduce using rule 13 (vars)
+
+
+State 78
+
+   41 statements: statements labeled_statement .
+
+    $default  reduce using rule 41 (statements)
+
+
+State 79
+
+   43 labeled_statement: label statement .
+
+    $default  reduce using rule 43 (labeled_statement)
+
+
+State 80
+
+   59 variable: variable "lparen" . expressions "rparen"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expressions      go to state 122
+    expression       go to state 107
+    listexpression   go to state 68
+
+
+State 81
+
+   56 assignment: variable "assign" . expression
+   57           | variable "assign" . "string"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "string"    shift, and go to state 123
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 124
+    listexpression   go to state 68
+
+
+State 82
+
+   58 variable: variable "dot" . "id"
+
+    "id"  shift, and go to state 125
+
+
+State 83
+
+  114 header: "subroutine" . "id" "lparen" formal_parameters "rparen"
+  115       | "subroutine" . "id"
+
+    "id"  shift, and go to state 126
+
+
+State 84
+
+  113 header: "list" . "function" "id" "lparen" formal_parameters "rparen"
+
+    "function"  shift, and go to state 127
+
+
+State 85
+
+  112 header: type . "function" "id" "lparen" formal_parameters "rparen"
+
+    "function"  shift, and go to state 128
+
+
+State 86
+
+  109 subprograms: subprograms subprogram .
+
+    $default  reduce using rule 109 (subprograms)
+
+
+State 87
+
+  111 subprogram: header . body "end"
+
+    $default  reduce using rule 6 (declarations)
+
+    body          go to state 129
+    declarations  go to state 3
+
+
+State 88
+
+   21 fields: fields . field
+   24 field: "record" fields . "endrec" vars
+
+    "int"      shift, and go to state 6
+    "real"     shift, and go to state 7
+    "logical"  shift, and go to state 8
+    "char"     shift, and go to state 9
+    "complex"  shift, and go to state 10
+    "record"   shift, and go to state 41
+    "endrec"   shift, and go to state 130
+
+    type   go to state 42
+    field  go to state 91
+
+
+State 89
+
+   12 vars: vars . "comma" undef_variable
+   23 field: type vars .
+
+    "comma"  shift, and go to state 121
+
+    $default  reduce using rule 23 (field)
+
+
+State 90
+
+    4 declarations: declarations "record" fields "endrec" . vars
+
+    "list"  shift, and go to state 74
+    "id"    shift, and go to state 75
+
+    vars            go to state 131
+    undef_variable  go to state 77
+
+
+State 91
+
+   21 fields: fields field .
+
+    $default  reduce using rule 21 (fields)
+
+
+State 92
+
+   27 value_list: "divop" . values "divop"
+
+    "addop"   shift, and go to state 132
+    "string"  shift, and go to state 133
+
+    $default  reduce using rule 33 (sign)
+
+    values  go to state 134
+    value   go to state 135
+    sign    go to state 136
+
+
+State 93
+
+   26 vals: "id" value_list .
+
+    $default  reduce using rule 26 (vals)
+
+
+State 94
+
+   25 vals: vals "comma" . "id" value_list
+
+    "id"  shift, and go to state 137
+
+
+State 95
+
+   83 goto_statement: "goto" "id" "comma" . "lparen" labels "rparen"
+
+    "lparen"  shift, and go to state 138
+
+
+State 96
+
+   91 read_list: read_list . "comma" read_item
+   94 read_item: "lparen" read_list . "comma" "id" "assign" iter_space "rparen"
+
+    "comma"  shift, and go to state 139
+
+
+State 97
+
+   91 read_list: read_list "comma" . read_item
+
+    "id"        shift, and go to state 22
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 50
+
+    variable   go to state 51
+    read_item  go to state 140
+
+
+State 98
+
+   76 expression: "new" "lparen" . expression "rparen"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 141
+    listexpression   go to state 68
+
+
+State 99
+
+   75 expression: "length" "lparen" . expression "rparen"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 142
+    listexpression   go to state 68
+
+
+State 100
+
+   77 expression: "lparen" . expression "rparen"
+   78           | "lparen" . expression "colon" expression "rparen"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 143
+    listexpression   go to state 68
+
+
+State 101
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   71           | "notop" expression .
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    "orop"     [reduce using rule 71 (expression)]
+    "andop"    [reduce using rule 71 (expression)]
+    "relop"    [reduce using rule 71 (expression)]
+    "addop"    [reduce using rule 71 (expression)]
+    "mulop"    [reduce using rule 71 (expression)]
+    "divop"    [reduce using rule 71 (expression)]
+    "powerop"  [reduce using rule 71 (expression)]
+    $default   reduce using rule 71 (expression)
+
+
+State 102
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   72           | "addop" expression .
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    "orop"     [reduce using rule 72 (expression)]
+    "andop"    [reduce using rule 72 (expression)]
+    "relop"    [reduce using rule 72 (expression)]
+    "addop"    [reduce using rule 72 (expression)]
+    "mulop"    [reduce using rule 72 (expression)]
+    "divop"    [reduce using rule 72 (expression)]
+    "powerop"  [reduce using rule 72 (expression)]
+    $default   reduce using rule 72 (expression)
+
+
+State 103
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   77           | "lparen" expression . "rparen"
+   78           | "lparen" expression . "colon" expression "rparen"
+  100 write_item: expression .
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+    "rparen"   shift, and go to state 144
+    "colon"    shift, and go to state 145
+
+    $default  reduce using rule 100 (write_item)
+
+
+State 104
+
+   98 write_list: write_list . "comma" write_item
+  101 write_item: "lparen" write_list . "comma" "id" "assign" iter_space "rparen"
+
+    "comma"  shift, and go to state 146
+
+
+State 105
+
+   81 listexpression: "lbrack" "rbrack" .
+
+    $default  reduce using rule 81 (listexpression)
+
+
+State 106
+
+   62 expressions: expressions . "comma" expression
+   80 listexpression: "lbrack" expressions . "rbrack"
+
+    "comma"   shift, and go to state 147
+    "rbrack"  shift, and go to state 148
+
+
+State 107
+
+   63 expressions: expression .
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    $default  reduce using rule 63 (expressions)
+
+
+State 108
+
+   64 expression: expression "orop" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 149
+    listexpression   go to state 68
+
+
+State 109
+
+   65 expression: expression "andop" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 150
+    listexpression   go to state 68
+
+
+State 110
+
+   66 expression: expression "relop" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 151
+    listexpression   go to state 68
+
+
+State 111
+
+   67 expression: expression "addop" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 152
+    listexpression   go to state 68
+
+
+State 112
+
+   68 expression: expression "mulop" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 153
+    listexpression   go to state 68
+
+
+State 113
+
+   69 expression: expression "divop" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 154
+    listexpression   go to state 68
+
+
+State 114
+
+   70 expression: expression "powerop" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 155
+    listexpression   go to state 68
+
+
+State 115
+
+   98 write_list: write_list "comma" . write_item
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "string"    shift, and go to state 62
+    "lparen"    shift, and go to state 63
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 67
+    listexpression   go to state 68
+    write_item       go to state 156
+
+
+State 116
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   86 if_statement: "if" "lparen" expression . "rparen" label "comma" label "comma" label
+   87             | "if" "lparen" expression . "rparen" simple_statement
+  105 branch_statement: "if" "lparen" expression . "rparen" "then" body tail
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+    "rparen"   shift, and go to state 157
+
+
+State 117
+
+  108 loop_statement: "do" "id" "assign" . iter_space body "enddo"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 158
+    listexpression   go to state 68
+    iter_space       go to state 159
+
+
+State 118
+
+   60 variable: "listfunc" "lparen" expression . "rparen"
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+    "rparen"   shift, and go to state 160
+
+
+State 119
+
+   14 undef_variable: "list" undef_variable .
+
+    $default  reduce using rule 14 (undef_variable)
+
+
+State 120
+
+   15 undef_variable: "id" "lparen" . dims "rparen"
+
+    "id"      shift, and go to state 161
+    "iconst"  shift, and go to state 162
+
+    dims  go to state 163
+    dim   go to state 164
+
+
+State 121
+
+   12 vars: vars "comma" . undef_variable
+
+    "list"  shift, and go to state 74
+    "id"    shift, and go to state 75
+
+    undef_variable  go to state 165
+
+
+State 122
+
+   59 variable: variable "lparen" expressions . "rparen"
+   62 expressions: expressions . "comma" expression
+
+    "rparen"  shift, and go to state 166
+    "comma"   shift, and go to state 147
+
+
+State 123
+
+   57 assignment: variable "assign" "string" .
+
+    $default  reduce using rule 57 (assignment)
+
+
+State 124
+
+   56 assignment: variable "assign" expression .
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    $default  reduce using rule 56 (assignment)
+
+
+State 125
+
+   58 variable: variable "dot" "id" .
+
+    $default  reduce using rule 58 (variable)
+
+
+State 126
+
+  114 header: "subroutine" "id" . "lparen" formal_parameters "rparen"
+  115       | "subroutine" "id" .
+
+    "lparen"  shift, and go to state 167
+
+    $default  reduce using rule 115 (header)
+
+
+State 127
+
+  113 header: "list" "function" . "id" "lparen" formal_parameters "rparen"
+
+    "id"  shift, and go to state 168
+
+
+State 128
+
+  112 header: type "function" . "id" "lparen" formal_parameters "rparen"
+
+    "id"  shift, and go to state 169
+
+
+State 129
+
+  111 subprogram: header body . "end"
+
+    "end"  shift, and go to state 170
+
+
+State 130
+
+   24 field: "record" fields "endrec" . vars
+
+    "list"  shift, and go to state 74
+    "id"    shift, and go to state 75
+
+    vars            go to state 171
+    undef_variable  go to state 77
+
+
+State 131
+
+    4 declarations: declarations "record" fields "endrec" vars .
+   12 vars: vars . "comma" undef_variable
+
+    "comma"  shift, and go to state 121
+
+    $default  reduce using rule 4 (declarations)
+
+
+State 132
+
+   32 sign: "addop" .
+
+    $default  reduce using rule 32 (sign)
+
+
+State 133
+
+   31 value: "string" .
+
+    $default  reduce using rule 31 (value)
+
+
+State 134
+
+   27 value_list: "divop" values . "divop"
+   28 values: values . "comma" value
+
+    "divop"  shift, and go to state 172
+    "comma"  shift, and go to state 173
+
+
+State 135
+
+   29 values: value .
+
+    $default  reduce using rule 29 (values)
+
+
+State 136
+
+   30 value: sign . constant
+
+    "iconst"  shift, and go to state 56
+    "rconst"  shift, and go to state 57
+    "lconst"  shift, and go to state 58
+    "cconst"  shift, and go to state 59
+    "lparen"  shift, and go to state 174
+
+    constant          go to state 175
+    simple_constant   go to state 176
+    complex_constant  go to state 177
+
+
+State 137
+
+   25 vals: vals "comma" "id" . value_list
+
+    "divop"  shift, and go to state 92
+
+    value_list  go to state 178
+
+
+State 138
+
+   83 goto_statement: "goto" "id" "comma" "lparen" . labels "rparen"
+
+    "iconst"  shift, and go to state 23
+
+    label   go to state 179
+    labels  go to state 180
+
+
+State 139
+
+   91 read_list: read_list "comma" . read_item
+   94 read_item: "lparen" read_list "comma" . "id" "assign" iter_space "rparen"
+
+    "id"        shift, and go to state 181
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 50
+
+    variable   go to state 51
+    read_item  go to state 140
+
+
+State 140
+
+   91 read_list: read_list "comma" read_item .
+
+    $default  reduce using rule 91 (read_list)
+
+
+State 141
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   76           | "new" "lparen" expression . "rparen"
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+    "rparen"   shift, and go to state 182
+
+
+State 142
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   75           | "length" "lparen" expression . "rparen"
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+    "rparen"   shift, and go to state 183
+
+
+State 143
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   77           | "lparen" expression . "rparen"
+   78           | "lparen" expression . "colon" expression "rparen"
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+    "rparen"   shift, and go to state 144
+    "colon"    shift, and go to state 145
+
+
+State 144
+
+   77 expression: "lparen" expression "rparen" .
+
+    $default  reduce using rule 77 (expression)
+
+
+State 145
+
+   78 expression: "lparen" expression "colon" . expression "rparen"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 184
+    listexpression   go to state 68
+
+
+State 146
+
+   98 write_list: write_list "comma" . write_item
+  101 write_item: "lparen" write_list "comma" . "id" "assign" iter_space "rparen"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 185
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "string"    shift, and go to state 62
+    "lparen"    shift, and go to state 63
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 67
+    listexpression   go to state 68
+    write_item       go to state 156
+
+
+State 147
+
+   62 expressions: expressions "comma" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 186
+    listexpression   go to state 68
+
+
+State 148
+
+   80 listexpression: "lbrack" expressions "rbrack" .
+
+    $default  reduce using rule 80 (listexpression)
+
+
+State 149
+
+   64 expression: expression . "orop" expression
+   64           | expression "orop" expression .
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    "orop"     [reduce using rule 64 (expression)]
+    "andop"    [reduce using rule 64 (expression)]
+    "relop"    [reduce using rule 64 (expression)]
+    "addop"    [reduce using rule 64 (expression)]
+    "mulop"    [reduce using rule 64 (expression)]
+    "divop"    [reduce using rule 64 (expression)]
+    "powerop"  [reduce using rule 64 (expression)]
+    $default   reduce using rule 64 (expression)
+
+
+State 150
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   65           | expression "andop" expression .
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    "orop"     [reduce using rule 65 (expression)]
+    "andop"    [reduce using rule 65 (expression)]
+    "relop"    [reduce using rule 65 (expression)]
+    "addop"    [reduce using rule 65 (expression)]
+    "mulop"    [reduce using rule 65 (expression)]
+    "divop"    [reduce using rule 65 (expression)]
+    "powerop"  [reduce using rule 65 (expression)]
+    $default   reduce using rule 65 (expression)
+
+
+State 151
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   66           | expression "relop" expression .
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    "orop"     [reduce using rule 66 (expression)]
+    "andop"    [reduce using rule 66 (expression)]
+    "relop"    [reduce using rule 66 (expression)]
+    "addop"    [reduce using rule 66 (expression)]
+    "mulop"    [reduce using rule 66 (expression)]
+    "divop"    [reduce using rule 66 (expression)]
+    "powerop"  [reduce using rule 66 (expression)]
+    $default   reduce using rule 66 (expression)
+
+
+State 152
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   67           | expression "addop" expression .
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    "orop"     [reduce using rule 67 (expression)]
+    "andop"    [reduce using rule 67 (expression)]
+    "relop"    [reduce using rule 67 (expression)]
+    "addop"    [reduce using rule 67 (expression)]
+    "mulop"    [reduce using rule 67 (expression)]
+    "divop"    [reduce using rule 67 (expression)]
+    "powerop"  [reduce using rule 67 (expression)]
+    $default   reduce using rule 67 (expression)
+
+
+State 153
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   68           | expression "mulop" expression .
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    "orop"     [reduce using rule 68 (expression)]
+    "andop"    [reduce using rule 68 (expression)]
+    "relop"    [reduce using rule 68 (expression)]
+    "addop"    [reduce using rule 68 (expression)]
+    "mulop"    [reduce using rule 68 (expression)]
+    "divop"    [reduce using rule 68 (expression)]
+    "powerop"  [reduce using rule 68 (expression)]
+    $default   reduce using rule 68 (expression)
+
+
+State 154
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   69           | expression "divop" expression .
+   70           | expression . "powerop" expression
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    "orop"     [reduce using rule 69 (expression)]
+    "andop"    [reduce using rule 69 (expression)]
+    "relop"    [reduce using rule 69 (expression)]
+    "addop"    [reduce using rule 69 (expression)]
+    "mulop"    [reduce using rule 69 (expression)]
+    "divop"    [reduce using rule 69 (expression)]
+    "powerop"  [reduce using rule 69 (expression)]
+    $default   reduce using rule 69 (expression)
+
+
+State 155
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   70           | expression "powerop" expression .
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    "orop"     [reduce using rule 70 (expression)]
+    "andop"    [reduce using rule 70 (expression)]
+    "relop"    [reduce using rule 70 (expression)]
+    "addop"    [reduce using rule 70 (expression)]
+    "mulop"    [reduce using rule 70 (expression)]
+    "divop"    [reduce using rule 70 (expression)]
+    "powerop"  [reduce using rule 70 (expression)]
+    $default   reduce using rule 70 (expression)
+
+
+State 156
+
+   98 write_list: write_list "comma" write_item .
+
+    $default  reduce using rule 98 (write_list)
+
+
+State 157
+
+   86 if_statement: "if" "lparen" expression "rparen" . label "comma" label "comma" label
+   87             | "if" "lparen" expression "rparen" . simple_statement
+  105 branch_statement: "if" "lparen" expression "rparen" . "then" body tail
+
+    "continue"  shift, and go to state 13
+    "goto"      shift, and go to state 14
+    "call"      shift, and go to state 15
+    "read"      shift, and go to state 16
+    "write"     shift, and go to state 17
+    "if"        shift, and go to state 187
+    "then"      shift, and go to state 188
+    "stop"      shift, and go to state 20
+    "return"    shift, and go to state 21
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 23
+    "listfunc"  shift, and go to state 24
+
+    label             go to state 189
+    simple_statement  go to state 190
+    assignment        go to state 31
+    variable          go to state 32
+    goto_statement    go to state 33
+    if_statement      go to state 34
+    subroutine_call   go to state 35
+    io_statement      go to state 36
+
+
+State 158
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   95 iter_space: expression . "comma" expression step
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+    "comma"    shift, and go to state 191
+
+
+State 159
+
+  108 loop_statement: "do" "id" "assign" iter_space . body "enddo"
+
+    $default  reduce using rule 6 (declarations)
+
+    body          go to state 192
+    declarations  go to state 3
+
+
+State 160
+
+   60 variable: "listfunc" "lparen" expression "rparen" .
+
+    $default  reduce using rule 60 (variable)
+
+
+State 161
+
+   20 dim: "id" .
+
+    $default  reduce using rule 20 (dim)
+
+
+State 162
+
+   19 dim: "iconst" .
+
+    $default  reduce using rule 19 (dim)
+
+
+State 163
+
+   15 undef_variable: "id" "lparen" dims . "rparen"
+   17 dims: dims . "comma" dim
+
+    "rparen"  shift, and go to state 193
+    "comma"   shift, and go to state 194
+
+
+State 164
+
+   18 dims: dim .
+
+    $default  reduce using rule 18 (dims)
+
+
+State 165
+
+   12 vars: vars "comma" undef_variable .
+
+    $default  reduce using rule 12 (vars)
+
+
+State 166
+
+   59 variable: variable "lparen" expressions "rparen" .
+
+    $default  reduce using rule 59 (variable)
+
+
+State 167
+
+  114 header: "subroutine" "id" "lparen" . formal_parameters "rparen"
+
+    "int"      shift, and go to state 6
+    "real"     shift, and go to state 7
+    "logical"  shift, and go to state 8
+    "char"     shift, and go to state 9
+    "complex"  shift, and go to state 10
+
+    type               go to state 195
+    formal_parameters  go to state 196
+
+
+State 168
+
+  113 header: "list" "function" "id" . "lparen" formal_parameters "rparen"
+
+    "lparen"  shift, and go to state 197
+
+
+State 169
+
+  112 header: type "function" "id" . "lparen" formal_parameters "rparen"
+
+    "lparen"  shift, and go to state 198
+
+
+State 170
+
+  111 subprogram: header body "end" .
+
+    $default  reduce using rule 111 (subprogram)
+
+
+State 171
+
+   12 vars: vars . "comma" undef_variable
+   24 field: "record" fields "endrec" vars .
+
+    "comma"  shift, and go to state 121
+
+    $default  reduce using rule 24 (field)
+
+
+State 172
+
+   27 value_list: "divop" values "divop" .
+
+    $default  reduce using rule 27 (value_list)
+
+
+State 173
+
+   28 values: values "comma" . value
+
+    "addop"   shift, and go to state 132
+    "string"  shift, and go to state 133
+
+    $default  reduce using rule 33 (sign)
+
+    value  go to state 199
+    sign   go to state 136
+
+
+State 174
+
+   40 complex_constant: "lparen" . "rconst" "colon" sign "rconst" "rparen"
+
+    "rconst"  shift, and go to state 200
+
+
+State 175
+
+   30 value: sign constant .
+
+    $default  reduce using rule 30 (value)
+
+
+State 176
+
+   34 constant: simple_constant .
+
+    $default  reduce using rule 34 (constant)
+
+
+State 177
+
+   35 constant: complex_constant .
+
+    $default  reduce using rule 35 (constant)
+
+
+State 178
+
+   25 vals: vals "comma" "id" value_list .
+
+    $default  reduce using rule 25 (vals)
+
+
+State 179
+
+   85 labels: label .
+
+    $default  reduce using rule 85 (labels)
+
+
+State 180
+
+   83 goto_statement: "goto" "id" "comma" "lparen" labels . "rparen"
+   84 labels: labels . "comma" label
+
+    "rparen"  shift, and go to state 201
+    "comma"   shift, and go to state 202
+
+
+State 181
+
+   61 variable: "id" .
+   94 read_item: "lparen" read_list "comma" "id" . "assign" iter_space "rparen"
+
+    "assign"  shift, and go to state 203
+
+    $default  reduce using rule 61 (variable)
+
+
+State 182
+
+   76 expression: "new" "lparen" expression "rparen" .
+
+    $default  reduce using rule 76 (expression)
+
+
+State 183
+
+   75 expression: "length" "lparen" expression "rparen" .
+
+    $default  reduce using rule 75 (expression)
+
+
+State 184
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   78           | "lparen" expression "colon" expression . "rparen"
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+    "rparen"   shift, and go to state 204
+
+
+State 185
+
+   61 variable: "id" .
+  101 write_item: "lparen" write_list "comma" "id" . "assign" iter_space "rparen"
+
+    "assign"  shift, and go to state 205
+
+    $default  reduce using rule 61 (variable)
+
+
+State 186
+
+   62 expressions: expressions "comma" expression .
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    $default  reduce using rule 62 (expressions)
+
+
+State 187
+
+   86 if_statement: "if" . "lparen" expression "rparen" label "comma" label "comma" label
+   87             | "if" . "lparen" expression "rparen" simple_statement
+
+    "lparen"  shift, and go to state 206
+
+
+State 188
+
+  105 branch_statement: "if" "lparen" expression "rparen" "then" . body tail
+
+    $default  reduce using rule 6 (declarations)
+
+    body          go to state 207
+    declarations  go to state 3
+
+
+State 189
+
+   86 if_statement: "if" "lparen" expression "rparen" label . "comma" label "comma" label
+
+    "comma"  shift, and go to state 208
+
+
+State 190
+
+   87 if_statement: "if" "lparen" expression "rparen" simple_statement .
+
+    $default  reduce using rule 87 (if_statement)
+
+
+State 191
+
+   95 iter_space: expression "comma" . expression step
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 209
+    listexpression   go to state 68
+
+
+State 192
+
+  108 loop_statement: "do" "id" "assign" iter_space body . "enddo"
+
+    "enddo"  shift, and go to state 210
+
+
+State 193
+
+   15 undef_variable: "id" "lparen" dims "rparen" .
+
+    $default  reduce using rule 15 (undef_variable)
+
+
+State 194
+
+   17 dims: dims "comma" . dim
+
+    "id"      shift, and go to state 161
+    "iconst"  shift, and go to state 162
+
+    dim  go to state 211
+
+
+State 195
+
+  116 formal_parameters: type . vars "comma" formal_parameters
+  117                  | type . vars
+
+    "list"  shift, and go to state 74
+    "id"    shift, and go to state 75
+
+    vars            go to state 212
+    undef_variable  go to state 77
+
+
+State 196
+
+  114 header: "subroutine" "id" "lparen" formal_parameters . "rparen"
+
+    "rparen"  shift, and go to state 213
+
+
+State 197
+
+  113 header: "list" "function" "id" "lparen" . formal_parameters "rparen"
+
+    "int"      shift, and go to state 6
+    "real"     shift, and go to state 7
+    "logical"  shift, and go to state 8
+    "char"     shift, and go to state 9
+    "complex"  shift, and go to state 10
+
+    type               go to state 195
+    formal_parameters  go to state 214
+
+
+State 198
+
+  112 header: type "function" "id" "lparen" . formal_parameters "rparen"
+
+    "int"      shift, and go to state 6
+    "real"     shift, and go to state 7
+    "logical"  shift, and go to state 8
+    "char"     shift, and go to state 9
+    "complex"  shift, and go to state 10
+
+    type               go to state 195
+    formal_parameters  go to state 215
+
+
+State 199
+
+   28 values: values "comma" value .
+
+    $default  reduce using rule 28 (values)
+
+
+State 200
+
+   40 complex_constant: "lparen" "rconst" . "colon" sign "rconst" "rparen"
+
+    "colon"  shift, and go to state 216
+
+
+State 201
+
+   83 goto_statement: "goto" "id" "comma" "lparen" labels "rparen" .
+
+    $default  reduce using rule 83 (goto_statement)
+
+
+State 202
+
+   84 labels: labels "comma" . label
+
+    "iconst"  shift, and go to state 23
+
+    label  go to state 217
+
+
+State 203
+
+   94 read_item: "lparen" read_list "comma" "id" "assign" . iter_space "rparen"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 158
+    listexpression   go to state 68
+    iter_space       go to state 218
+
+
+State 204
+
+   78 expression: "lparen" expression "colon" expression "rparen" .
+
+    $default  reduce using rule 78 (expression)
+
+
+State 205
+
+  101 write_item: "lparen" write_list "comma" "id" "assign" . iter_space "rparen"
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 158
+    listexpression   go to state 68
+    iter_space       go to state 219
+
+
+State 206
+
+   86 if_statement: "if" "lparen" . expression "rparen" label "comma" label "comma" label
+   87             | "if" "lparen" . expression "rparen" simple_statement
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 220
+    listexpression   go to state 68
+
+
+State 207
+
+  105 branch_statement: "if" "lparen" expression "rparen" "then" body . tail
+
+    "else"   shift, and go to state 221
+    "endif"  shift, and go to state 222
+
+    tail  go to state 223
+
+
+State 208
+
+   86 if_statement: "if" "lparen" expression "rparen" label "comma" . label "comma" label
+
+    "iconst"  shift, and go to state 23
+
+    label  go to state 224
+
+
+State 209
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   95 iter_space: expression "comma" expression . step
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+    "comma"    shift, and go to state 225
+
+    $default  reduce using rule 97 (step)
+
+    step  go to state 226
+
+
+State 210
+
+  108 loop_statement: "do" "id" "assign" iter_space body "enddo" .
+
+    $default  reduce using rule 108 (loop_statement)
+
+
+State 211
+
+   17 dims: dims "comma" dim .
+
+    $default  reduce using rule 17 (dims)
+
+
+State 212
+
+   12 vars: vars . "comma" undef_variable
+  116 formal_parameters: type vars . "comma" formal_parameters
+  117                  | type vars .
+
+    "comma"  shift, and go to state 227
+
+    $default  reduce using rule 117 (formal_parameters)
+
+
+State 213
+
+  114 header: "subroutine" "id" "lparen" formal_parameters "rparen" .
+
+    $default  reduce using rule 114 (header)
+
+
+State 214
+
+  113 header: "list" "function" "id" "lparen" formal_parameters . "rparen"
+
+    "rparen"  shift, and go to state 228
+
+
+State 215
+
+  112 header: type "function" "id" "lparen" formal_parameters . "rparen"
+
+    "rparen"  shift, and go to state 229
+
+
+State 216
+
+   40 complex_constant: "lparen" "rconst" "colon" . sign "rconst" "rparen"
+
+    "addop"  shift, and go to state 132
+
+    $default  reduce using rule 33 (sign)
+
+    sign  go to state 230
+
+
+State 217
+
+   84 labels: labels "comma" label .
+
+    $default  reduce using rule 84 (labels)
+
+
+State 218
+
+   94 read_item: "lparen" read_list "comma" "id" "assign" iter_space . "rparen"
+
+    "rparen"  shift, and go to state 231
+
+
+State 219
+
+  101 write_item: "lparen" write_list "comma" "id" "assign" iter_space . "rparen"
+
+    "rparen"  shift, and go to state 232
+
+
+State 220
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   86 if_statement: "if" "lparen" expression . "rparen" label "comma" label "comma" label
+   87             | "if" "lparen" expression . "rparen" simple_statement
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+    "rparen"   shift, and go to state 233
+
+
+State 221
+
+  106 tail: "else" . body "endif"
+
+    $default  reduce using rule 6 (declarations)
+
+    body          go to state 234
+    declarations  go to state 3
+
+
+State 222
+
+  107 tail: "endif" .
+
+    $default  reduce using rule 107 (tail)
+
+
+State 223
+
+  105 branch_statement: "if" "lparen" expression "rparen" "then" body tail .
+
+    $default  reduce using rule 105 (branch_statement)
+
+
+State 224
+
+   86 if_statement: "if" "lparen" expression "rparen" label "comma" label . "comma" label
+
+    "comma"  shift, and go to state 235
+
+
+State 225
+
+   96 step: "comma" . expression
+
+    "new"       shift, and go to state 54
+    "length"    shift, and go to state 55
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 56
+    "rconst"    shift, and go to state 57
+    "lconst"    shift, and go to state 58
+    "cconst"    shift, and go to state 59
+    "notop"     shift, and go to state 60
+    "addop"     shift, and go to state 61
+    "listfunc"  shift, and go to state 24
+    "lparen"    shift, and go to state 100
+    "lbrack"    shift, and go to state 64
+
+    simple_constant  go to state 65
+    variable         go to state 66
+    expression       go to state 236
+    listexpression   go to state 68
+
+
+State 226
+
+   95 iter_space: expression "comma" expression step .
+
+    $default  reduce using rule 95 (iter_space)
+
+
+State 227
+
+   12 vars: vars "comma" . undef_variable
+  116 formal_parameters: type vars "comma" . formal_parameters
+
+    "int"      shift, and go to state 6
+    "real"     shift, and go to state 7
+    "logical"  shift, and go to state 8
+    "char"     shift, and go to state 9
+    "complex"  shift, and go to state 10
+    "list"     shift, and go to state 74
+    "id"       shift, and go to state 75
+
+    type               go to state 195
+    undef_variable     go to state 165
+    formal_parameters  go to state 237
+
+
+State 228
+
+  113 header: "list" "function" "id" "lparen" formal_parameters "rparen" .
+
+    $default  reduce using rule 113 (header)
+
+
+State 229
+
+  112 header: type "function" "id" "lparen" formal_parameters "rparen" .
+
+    $default  reduce using rule 112 (header)
+
+
+State 230
+
+   40 complex_constant: "lparen" "rconst" "colon" sign . "rconst" "rparen"
+
+    "rconst"  shift, and go to state 238
+
+
+State 231
+
+   94 read_item: "lparen" read_list "comma" "id" "assign" iter_space "rparen" .
+
+    $default  reduce using rule 94 (read_item)
+
+
+State 232
+
+  101 write_item: "lparen" write_list "comma" "id" "assign" iter_space "rparen" .
+
+    $default  reduce using rule 101 (write_item)
+
+
+State 233
+
+   86 if_statement: "if" "lparen" expression "rparen" . label "comma" label "comma" label
+   87             | "if" "lparen" expression "rparen" . simple_statement
+
+    "continue"  shift, and go to state 13
+    "goto"      shift, and go to state 14
+    "call"      shift, and go to state 15
+    "read"      shift, and go to state 16
+    "write"     shift, and go to state 17
+    "if"        shift, and go to state 187
+    "stop"      shift, and go to state 20
+    "return"    shift, and go to state 21
+    "id"        shift, and go to state 22
+    "iconst"    shift, and go to state 23
+    "listfunc"  shift, and go to state 24
+
+    label             go to state 189
+    simple_statement  go to state 190
+    assignment        go to state 31
+    variable          go to state 32
+    goto_statement    go to state 33
+    if_statement      go to state 34
+    subroutine_call   go to state 35
+    io_statement      go to state 36
+
+
+State 234
+
+  106 tail: "else" body . "endif"
+
+    "endif"  shift, and go to state 239
+
+
+State 235
+
+   86 if_statement: "if" "lparen" expression "rparen" label "comma" label "comma" . label
+
+    "iconst"  shift, and go to state 23
+
+    label  go to state 240
+
+
+State 236
+
+   64 expression: expression . "orop" expression
+   65           | expression . "andop" expression
+   66           | expression . "relop" expression
+   67           | expression . "addop" expression
+   68           | expression . "mulop" expression
+   69           | expression . "divop" expression
+   70           | expression . "powerop" expression
+   96 step: "comma" expression .
+
+    "orop"     shift, and go to state 108
+    "andop"    shift, and go to state 109
+    "relop"    shift, and go to state 110
+    "addop"    shift, and go to state 111
+    "mulop"    shift, and go to state 112
+    "divop"    shift, and go to state 113
+    "powerop"  shift, and go to state 114
+
+    $default  reduce using rule 96 (step)
+
+
+State 237
+
+  116 formal_parameters: type vars "comma" formal_parameters .
+
+    $default  reduce using rule 116 (formal_parameters)
+
+
+State 238
+
+   40 complex_constant: "lparen" "rconst" "colon" sign "rconst" . "rparen"
+
+    "rparen"  shift, and go to state 241
+
+
+State 239
+
+  106 tail: "else" body "endif" .
+
+    $default  reduce using rule 106 (tail)
+
+
+State 240
+
+   86 if_statement: "if" "lparen" expression "rparen" label "comma" label "comma" label .
+
+    $default  reduce using rule 86 (if_statement)
+
+
+State 241
+
+   40 complex_constant: "lparen" "rconst" "colon" sign "rconst" "rparen" .
+
+    $default  reduce using rule 40 (complex_constant)
