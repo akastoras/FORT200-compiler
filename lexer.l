@@ -37,7 +37,7 @@ WHITECHAR	[ \t\v\n]
 
 ALPHA		[a-z]
 ALNUM		[0-9a-z]
-ID			(_{ALPHA}((_?{ALNUM})+)*_)|({ALPHA}{ALNUM}*)
+ID			(_{ALPHA}(_?{ALNUM})*_)|({ALPHA}{ALNUM}*)
 
 VALID_DNUM	([1-9][0-9]*)|0
 VALID_HNUM	([1-9A-F][0-9A-F]*)
@@ -133,6 +133,10 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 {RCONST_D}		{ printf("Found real: %lf as \"%s\", in line %d\n", strtod(yytext, NULL), yytext, yylineno); return T_RCONST; }
 {RCONST_H}		{ printf("Found real: %lf as \"%s\", in line %d\n", GET_REAL_VALUE(yytext, 16), yytext, yylineno); return T_RCONST; }
 {RCONST_B}		{ printf("Found real: %lf as \"%s\", in line %d\n", GET_REAL_VALUE(yytext, 2), yytext, yylineno); return T_RCONST; }
+
+ /* Lconst */
+".TRUE."		{ printf("Found bool True, in line %d\n", yylineno);	return T_LCONST; }
+".FALSE."		{ printf("Found bool False, in line %d\n", yylineno);	return T_LCONST; }
 
 
  /* Operators */
