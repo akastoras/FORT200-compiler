@@ -1,6 +1,7 @@
 CC = gcc
 LEXER = lexer.l
-BIN = lexer.lexer.bin
+PARSER = parser.y
+BIN = compiler.bin
 CFLAGS = -Wall
 LFLAGS = -lm -lfl
 
@@ -9,11 +10,14 @@ all: $(BIN)
 lex.yy.c: $(LEXER)
 	flex $^
 
-%.lexer.bin: lex.yy.c
+parser.tab.c: $(PARSER)
+	bison -vd $^
+
+compiler.bin: parser.tab.c lex.yy.c
 	gcc $(CFLAGS) $^ -o $@ $(LFLAGS)
 
 run: all
 	./$(BIN) tests/test1.f
 
 clean:
-	rm *.lexer.bin *.yy.c
+	rm *.bin *.yy.c *.tab.* parser.output
