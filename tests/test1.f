@@ -1,4 +1,4 @@
-integer x(g),z,i,j, list l
+integer thanos_kastoras(g),z,i,j, list l
 data x/5,-2,3/,z/.true./
 record integer i,j real a(10) record logical t,f endrec logic(10) endrec r
 complex a(3)

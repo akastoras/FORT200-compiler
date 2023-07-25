@@ -4,10 +4,9 @@
 	#include <unistd.h>
 	#include <string.h>
 	#include <errno.h>
-	// #include <math.h>
 	#include <stdbool.h>
 	#include "parser.tab.h"
-    
+
 	extern FILE *yyin;
 	extern int yylex();
 	extern void yyerror(const char *err);
@@ -17,8 +16,8 @@
 
 %union	{
 	int 		intval;
-	long 		lval;
-	long double	rval;
+	bool 		lval;
+	double		rval;
 	char		charval;
 	char *		strval;
 }
@@ -54,7 +53,7 @@
 %token	T_RETURN		"return"
 	
 // ID
-%token	T_ID	"id"
+%token	<strval>	T_ID	"id"
 
 // Constants
 %token	<intval>	T_ICONST	"iconst"
@@ -90,6 +89,22 @@
 
 %token	T_EOF	0	"EOF"
  
+// Declaring types for non-terminal variables
+%type <strval> program body declarations type vars undef_variable dims dim fields field vals value_list values value sign constant simple_constant complex_constant statements labeled_statement label statement simple_statement assignment variable expressions expression listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement subprograms subprogram header formal_parameters
+
+
+
+/* Declaring ascociativities and priorities */
+/* Operators listed in descending priority
+with specified associativity (left/right/nonassoc) */
+%left T_OROP
+%left T_ANDOP
+%nonassoc T_NOTOP
+%nonassoc T_RELOP
+%left T_ADDOP
+%left T_MULOP T_DIVOP
+%right T_POWEROP
+
 %%
 
 program:			body T_END subprograms

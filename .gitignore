@@ -1,2 +1,4 @@
 *.bin
 *.yy.c
+*.tab.*
+parser.output

@@ -11,7 +11,7 @@ lex.yy.c: $(LEXER)
 	flex $^
 
 parser.tab.c: $(PARSER)
-	bison -vd $^
+	bison -vd $^ -Wno-other
 
 compiler.bin: parser.tab.c lex.yy.c
 	gcc $(CFLAGS) $^ -o $@ $(LFLAGS)
