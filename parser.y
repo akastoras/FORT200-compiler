@@ -97,6 +97,7 @@
 /* Declaring ascociativities and priorities */
 /* Operators listed in descending priority
 with specified associativity (left/right/nonassoc) */
+%nonassoc error
 %left T_OROP
 %left T_ANDOP
 %nonassoc T_NOTOP
@@ -108,6 +109,7 @@ with specified associativity (left/right/nonassoc) */
 %%
 
 program:			body T_END subprograms
+					/* | body error T_EOF { yyerror("Expected keyword 'end' at the end of the program"); yyerrok; } */
 
 body:				declarations statements
 
@@ -119,6 +121,7 @@ declarations:		declarations type vars
 type:				T_INTEGER | T_REAL | T_LOGICAL | T_CHARACTER | T_COMPLEX
 
 vars:				vars T_COMMA undef_variable
+					| vars error undef_variable { yyerror("Missing seperator ',' between variable definitions"); yyerrok; }
 					| undef_variable
 
 undef_variable:		T_LIST undef_variable
@@ -203,6 +206,7 @@ expression:			expression T_OROP expression
 					| T_LPAREN expression T_RPAREN
 					| T_LPAREN expression T_COLON expression T_RPAREN
 					| listexpression
+					| expression error expression { yyerror("Expected operator or seperator ',' between expressions"); yyerrok; }
 
 listexpression:		T_LBRACK expressions T_RBRACK
 					| T_LBRACK T_RBRACK
@@ -211,6 +215,7 @@ goto_statement:		T_GOTO label
 					| T_GOTO T_ID T_COMMA T_LPAREN labels T_RPAREN
 
 labels:				labels T_COMMA label
+					| labels error label { yyerror("Missing seperator between labels"); yyerrok; }
 					| label
 
 if_statement:		T_IF T_LPAREN expression T_RPAREN label T_COMMA label T_COMMA label

@@ -7,11 +7,11 @@ LFLAGS = -lm -lfl
 
 all: $(BIN)
 
-lex.yy.c: $(LEXER)
-	flex $^
+lex.yy.c: $(LEXER) constants.h
+	flex $<
 
-parser.tab.c: $(PARSER)
-	bison -vd $^ -Wno-other
+parser.tab.c: $(PARSER) constants.h
+	bison -vd $< -Wno-other -Wcounterexamples
 
 compiler.bin: parser.tab.c lex.yy.c
 	gcc $(CFLAGS) $^ -o $@ $(LFLAGS)

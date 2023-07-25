@@ -58,8 +58,12 @@
 WHITECHAR	[ \t\v\n]
 
 ALPHA		[a-z]
+NUM			[0-9]
 ALNUM		[0-9a-z]
 ID			(_{ALPHA}(_?{ALNUM})*_)|({ALPHA}{ALNUM}*)
+WRONG_ID_UNDERSCORE	(({ALNUM}+_)+)|((_{ALNUM}+)+)|({ALNUM}+(_{ALNUM}*)+)
+WRONG_ID_NONALPHA	(_{NUM}(_?{ALNUM})*_)|({NUM}{ALNUM}*)
+
 
 VALID_DNUM	([1-9][0-9]*)|0
 VALID_HNUM	([1-9A-F][0-9A-F]*)
@@ -73,7 +77,7 @@ ICONST_B	0B{VALID_BNUM}
 /* Decimal Real Constants */
 RCONST_D_1	{VALID_DNUM}?\.([0-9]*[1-9][0-9]*|0)
 RCONST_D_2	{VALID_DNUM}(\.([0-9]*[1-9][0-9]*|0)?)?
-RCONST_D	{RCONST_D_1}|{RCONST_D_2}(E[+-]?{VALID_DNUM})?
+RCONST_D	({RCONST_D_1}|{RCONST_D_2})(E[+-]?{VALID_DNUM})?
 
 /* Hexadecimal Real Constants */
 RCONST_H_1	({VALID_HNUM}|0)?\.([0-9A-F]*[1-9A-F][0-9A-F]*|0)
@@ -192,6 +196,8 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 
  /* Identifier */
 {ID}			{ return print_token(T_ID); }
+{WRONG_ID_UNDERSCORE}	{ yyerror("Ids that contain '_' have to start and end in '_'"); }
+{WRONG_ID_NONALPHA}		{ yyerror("Ids' first character (after the optional '_') must be an alphabetical character"); }
 
 .				{ yyerror("Unknown Character");}
 }
@@ -335,12 +341,9 @@ void yyerror(const char *s)
 	printf("ERROR: %s in line %d\n", s, yylineno);
 
 	if (errors > 5) {
-		printf("%d errors encountered.\n", errors);
+		printf("%d errors encountered. Compilation not possible...\n", errors);
 		exit(1);
 	}
-
-	// Used to perform panic mode recovery
-	yyless(1);
 }
 
 /* Checks if `value` exists in `array` with `size` elements */
