@@ -7,13 +7,17 @@ LFLAGS = -lm -lfl
 
 all: $(BIN)
 
+hashtbl.o: hashtbl.c hashtbl.h
+	gcc -o hashtbl.o -c hashtbl.c
+
 lex.yy.c: $(LEXER) constants.h
 	flex $<
 
 parser.tab.c: $(PARSER) constants.h
-	bison -vd $< -Wno-other -Wcounterexamples
+	bison -vd $< 
+#-Wno-other -Wcounterexamples
 
-compiler.bin: parser.tab.c lex.yy.c
+compiler.bin: parser.tab.c lex.yy.c  hashtbl.o
 	gcc $(CFLAGS) $^ -o $@ $(LFLAGS)
 
 run: all
