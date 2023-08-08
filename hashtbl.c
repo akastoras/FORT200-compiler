@@ -18,15 +18,13 @@ Retrieved from: http://en.literateprograms.org/Hash_table_(C)?oldid=19638
  * debug information and printing the hashtable as table.
  */
 #define HASHTBL_DEBUG 1
-#define HASHTBL_SHOW_INSERT 1
+#define HASHTBL_SHOW_INSERT 0
 #define HASHTBL_SHOW_GET 1
 #define HASHTBL_SHOW_GET_AS_TABLE 1
 
 #include "hashtbl.h"
-#include "settings.h"
-
-#include<string.h>
-#include<stdio.h>
+#include <string.h>
+#include <stdio.h>
 
 static char *mystrdup(const char *s)
 {

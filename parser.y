@@ -6,7 +6,7 @@
 	#include <errno.h>
 	#include <stdbool.h>
 	#include "parser.tab.h"
-	#include "symbol_table.h"
+	#include "hashtbl.h"
 
 	extern FILE *yyin;
 	extern int yylex();
@@ -162,7 +162,7 @@ constant:			simple_constant
 
 simple_constant:	T_ICONST | T_RCONST | T_LCONST | T_CCONST
 
-complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN { $$ = create_complex($2, $5); }
+complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN
 
 statements:			statements labeled_statement
 					| labeled_statement
@@ -286,7 +286,9 @@ int main(int argc, char **argv)
 	if (argc > 1) {
 		yyin = fopen(argv[1], "r");
 		if (yyin == NULL) {
-			perror("Error opening file %s", argv[1]);
+			char buff[20];
+			sprintf(buff, "Error opening file %s", argv[1]);
+			perror(buff);
 			return -1;
 		}
 	}

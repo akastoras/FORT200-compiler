@@ -31,7 +31,8 @@ call _try_me_(x(u),y,l)
 if (y(g(y(z-2)))+a(1,cadr(l))) 100,1000,1001
 y = .not. x(i)
 enddo $ 1000 $
-end
+	end
+
 subroutine _try_me_(integer n,a(n))
 do i=1,n
    if (a(i) .gt. 0) a(i) = a(i) - i
