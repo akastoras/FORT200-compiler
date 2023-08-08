@@ -7,8 +7,9 @@
 	#include <errno.h>
 	#include <math.h>
 	#include <stdbool.h>
-	#include "parser.tab.h"
 	#include "constants.h"
+	#include "ast.h"
+	#include "parser.tab.h"
 	
 	#define GET_INT_VALUE(text, base) (strtol(text + 2, NULL, base))
 	#define GET_REAL_VALUE(text, base) (base == 16 ? hextod(text): bintod(text))

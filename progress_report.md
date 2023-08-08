@@ -40,3 +40,16 @@
 * Implement the symbol table as shown in the last 40 minutes of video tutorial 2 (Spiros & Ioanna)
 * Wrote code that lets the parser insert tokens into the hashtable while keeping track of the scope that they belong to.
 * Wrote code that updates the scope variable when needed
+
+### Session 5 (Thanos & Tolis)
+
+1. Minor fixes in symbol table (some inserts were not correct)
+
+2. New files ast.c/h with implementation of functions that create
+new objects for AST nodes.
+
+3. Each grammar variable (will have) has it's own struct.
+
+#### TODO:
+Check for more errors in symbol table inserts. (vals)
+Create new files semantics.c/h for implementing semantic rules

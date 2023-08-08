@@ -5,8 +5,10 @@
 	#include <string.h>
 	#include <errno.h>
 	#include <stdbool.h>
-	#include "parser.tab.h"
+	#include "ast.h"
 	#include "hashtbl.h"
+	
+	#include "parser.tab.h"
 
 	extern FILE *yyin;
 	extern int yylex();
@@ -19,42 +21,47 @@
 %define parse.error verbose
 
 %union	{
-	int 		intval;
-	bool 		lval;
-	double		rval;
-	char		charval;
-	char *		strval;
+	int 			intval;
+	bool 			lval;
+	double			rval;
+	char			charval;
+	char			*strval;
+
+	AST_Type		*typeval;
+	AST_Constant	*constval;
+	AST_Sign		*signval;
+	// AST_Expression	*exprval;
 }
 
 //  optional required  optional  optional
 // %token    <type>    <name>    <number>  "description"
-%token	T_FUNCTION		"function"
-%token	T_SUBROUTINE	"subroutine" 
-%token	T_END			"end"
-%token	T_INTEGER		"int"
-%token	T_REAL			"real"
-%token	T_LOGICAL 		"logical"
-%token	T_CHARACTER 	"char"
-%token	T_COMPLEX 		"complex"
-%token	T_RECORD		"record"
-%token	T_ENDREC		"endrec"
-%token	T_LIST			"list"
-%token	T_DATA			"data"
-%token	T_CONTINUE		"continue"
-%token	T_GOTO			"goto"
-%token	T_CALL			"call"
-%token	T_READ			"read"
-%token	T_WRITE			"write"
-%token	T_NEW			"new"
-%token	T_LENGTH		"length"
-%token	T_IF			"if" 
-%token	T_THEN			"then" 
-%token	T_ELSE			"else"
-%token	T_ENDIF			"endif"
-%token	T_DO			"do"
-%token	T_ENDDO			"enddo"
-%token	T_STOP			"stop"
-%token	T_RETURN		"return"
+%token	<strval> T_FUNCTION		"function"
+%token	<strval> T_SUBROUTINE	"subroutine"
+%token	<strval> T_END			"end"
+%token	<strval> T_INTEGER		"int"
+%token	<strval> T_REAL			"real"
+%token	<strval> T_LOGICAL 		"logical"
+%token	<strval> T_CHARACTER 	"char"
+%token	<strval> T_COMPLEX 		"complex"
+%token	<strval> T_RECORD		"record"
+%token	<strval> T_ENDREC		"endrec"
+%token	<strval> T_LIST			"list"
+%token	<strval> T_DATA			"data"
+%token	<strval> T_CONTINUE		"continue"
+%token	<strval> T_GOTO			"goto"
+%token	<strval> T_CALL			"call"
+%token	<strval> T_READ			"read"
+%token	<strval> T_WRITE		"write"
+%token	<strval> T_NEW			"new"
+%token	<strval> T_LENGTH		"length"
+%token	<strval> T_IF			"if" 
+%token	<strval> T_THEN			"then" 
+%token	<strval> T_ELSE			"else"
+%token	<strval> T_ENDIF		"endif"
+%token	<strval> T_DO			"do"
+%token	<strval> T_ENDDO		"enddo"
+%token	<strval> T_STOP			"stop"
+%token	<strval> T_RETURN		"return"
 	
 // ID
 %token	<strval>	T_ID	"id"
@@ -69,33 +76,36 @@
 %token	<strval>	T_STRING	"string"
 
 // Operators
-%token	T_OROP		"orop"
-%token	T_ANDOP		"andop"
-%token	T_NOTOP		"notop"
-%token	T_RELOP 	".GT. or .GE. or .LT. or .LE. or .EQ. or NE."
-%token	T_ADDOP		"+ or -"
-%token	T_MULOP		"mulop"
-%token	T_DIVOP		"divop"
-%token	T_POWEROP	"powerop"
+%token	<strval>	T_OROP		"orop"
+%token	<strval>	T_ANDOP		"andop"
+%token	<strval>	T_NOTOP		"notop"
+%token	<strval>	T_RELOP 	".GT. or .GE. or .LT. or .LE. or .EQ. or NE."
+%token	<strval>	T_ADDOP		"+ or -"
+%token	<strval>	T_MULOP		"mulop"
+%token	<strval>	T_DIVOP		"divop"
+%token	<strval>	T_POWEROP	"powerop"
 
 // List Functions
 %token	T_LISTFUNC	"listfunc"
 
 //Other
-%token	T_LPAREN	"lparen"
-%token	T_RPAREN	"rparen"
-%token	T_COMMA		"comma"
-%token	T_ASSIGN	"assign"
-%token	T_DOT		"dot"
-%token	T_COLON		"colon"
-%token	T_LBRACK	"lbrack"
-%token	T_RBRACK	"rbrack"
+%token	<strval>	T_LPAREN	"lparen"
+%token	<strval>	T_RPAREN	"rparen"
+%token	<strval>	T_COMMA		"comma"
+%token	<strval>	T_ASSIGN	"assign"
+%token	<strval>	T_DOT		"dot"
+%token	<strval>	T_COLON		"colon"
+%token	<strval>	T_LBRACK	"lbrack"
+%token	<strval>	T_RBRACK	"rbrack"
 
 %token	T_EOF	0	"EOF"
  
 // Declaring types for non-terminal variables
-%type <strval> program body declarations type vars undef_variable dims dim fields field vals value_list values value sign constant simple_constant complex_constant statements labeled_statement label statement simple_statement assignment variable expressions expression listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement subprograms subprogram header formal_parameters
-
+%type <strval> program body declarations vars undef_variable dims dim fields field vals value_list values value statements labeled_statement label statement simple_statement assignment variable expressions listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement subprograms subprogram header formal_parameters
+%type <typeval> type
+%type <constval> constant simple_constant complex_constant
+%type <signval> sign
+%type <exprval> expression
 
 
 /* Declaring ascociativities and priorities */
@@ -122,7 +132,11 @@ declarations:		declarations type vars
 					| declarations T_DATA vals
 					| %empty
 
-type:				T_INTEGER | T_REAL | T_LOGICAL | T_CHARACTER | T_COMPLEX
+type:				T_INTEGER		{ $$ = ast_get_type_int(); }
+					| T_REAL		{ $$ = ast_get_type_real(); }
+					| T_LOGICAL 	{ $$ = ast_get_type_logical(); }
+					| T_CHARACTER	{ $$ = ast_get_type_character(); }
+					| T_COMPLEX		{ $$ = ast_get_type_complex(); } 
 
 vars:				vars T_COMMA undef_variable
 					| vars error undef_variable { yyerror("Missing seperator ',' between variable definitions"); yyerrok; }
@@ -152,18 +166,27 @@ value_list:			T_DIVOP values T_DIVOP
 values:				values T_COMMA value
 					| value
 
+// Get value from sign and constant
+// make sure that the constant type takes a sign
 value:				sign constant
 					| T_STRING
 
-sign:				T_ADDOP | %empty
+// Get sign as NONE, POSITIVE, or NEGATIVE
+sign:				T_ADDOP { $$ = ast_get_sign($1); }
+					| %empty { $$ = ast_get_sign(NULL); }
 
-constant:			simple_constant
-					| complex_constant
+// In constant just propagate the value of simple or complex constant
+constant:			simple_constant { $$ = $1; }
+					| complex_constant { $$ = $1; }
 
-simple_constant:	T_ICONST | T_RCONST | T_LCONST | T_CCONST
+// Give a type depending on the token returned from lexer, and copy the value
+simple_constant:	T_ICONST { $$ = ast_get_ICONST($1); }
+					| T_RCONST { $$ = ast_get_RCONST($1); }
+					| T_LCONST { $$ = ast_get_LCONST($1); }
+					| T_CCONST { $$ = ast_get_CCONST($1); }
 
-complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN
-
+// Give the complex type as well as the real and imaginary values of the complex number
+complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN { $$ = ast_get_CMPLX($2, $5); }
 statements:			statements labeled_statement
 					| labeled_statement
 
@@ -187,10 +210,10 @@ simple_statement:	assignment
 assignment:			variable T_ASSIGN expression
 					| variable T_ASSIGN T_STRING
 
-variable:			variable T_DOT T_ID					{ hashtbl_insert(symbol_table, $3, NULL, scope); }
+variable:			variable T_DOT T_ID
 					| variable T_LPAREN expressions T_RPAREN
 					| T_LISTFUNC T_LPAREN expression T_RPAREN
-					| T_ID								{ hashtbl_insert(symbol_table, $1, NULL, scope); }
+					| T_ID
 
 expressions:		expressions T_COMMA expression
 					| expression
