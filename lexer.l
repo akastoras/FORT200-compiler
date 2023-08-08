@@ -195,7 +195,7 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 "C"(AD*|D+)"R"	{ return print_token(T_LISTFUNC); }
 
  /* Identifier */
-{ID}			{ return print_token(T_ID); }
+{ID}			{ yylval.strval = strdup(yytext); return print_token(T_ID); }
 {WRONG_ID_UNDERSCORE}	{ yyerror("Ids that contain '_' have to start and end in '_'"); }
 {WRONG_ID_NONALPHA}		{ yyerror("Ids' first character (after the optional '_') must be an alphabetical character"); }
 
@@ -360,7 +360,7 @@ bool in(int value, int *array, int size) {
 int print_token(int token) {
 #ifdef VERBOSE_LEXER 
 	if (IS_ID(token)) {
-		printf("Found id \"%s\", in line %d\n", yytext, yylineno); yylval.strval = strdup(yytext);
+		printf("Found id \"%s\", in line %d\n", yytext, yylineno);
 	}
 	else if (IS_KEYWORD(token)) {
 		printf("Found keyword \"%s\", in line %d\n", yytext, yylineno);

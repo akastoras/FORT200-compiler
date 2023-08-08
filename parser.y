@@ -6,13 +6,13 @@
 	#include <errno.h>
 	#include <stdbool.h>
 	#include "parser.tab.h"
-	#include "hashtbl.h"
+	#include "symbol_table.h"
 
 	extern FILE *yyin;
 	extern int yylex();
 	extern void yyerror(const char *err);
 
-	HASHTBL *hashtbl;
+	HASHTBL *symbol_table;
 	int scope = 0;
 %}
 
@@ -112,7 +112,7 @@ with specified associativity (left/right/nonassoc) */
 
 %%
 
-program:			body T_END subprograms
+program:			body T_END subprograms { hashtbl_get(symbol_table, scope); }
 					/* | body error T_EOF { yyerror("Expected keyword 'end' at the end of the program"); yyerrok; } */
 
 body:				declarations statements
@@ -129,14 +129,14 @@ vars:				vars T_COMMA undef_variable
 					| undef_variable
 
 undef_variable:		T_LIST undef_variable
-					| T_ID T_LPAREN dims T_RPAREN	{hashtbl_insert(hashtbl, $1, NULL, scope);}
-					| T_ID							{hashtbl_insert(hashtbl, $1, NULL, scope);}
+					| T_ID T_LPAREN dims T_RPAREN	{ hashtbl_insert(symbol_table, $1, NULL, scope); }
+					| T_ID							{ hashtbl_insert(symbol_table, $1, NULL, scope); }
 
 dims:				dims T_COMMA dim
 					| dim
 
 dim:				T_ICONST 
-					| T_ID							{hashtbl_insert(hashtbl, $1, NULL, scope);}
+					| T_ID							{ hashtbl_insert(symbol_table, $1, NULL, scope); }
 
 fields:				fields field
 					| field
@@ -144,8 +144,8 @@ fields:				fields field
 field:				type vars
 					| T_RECORD fields T_ENDREC vars
 
-vals:				vals T_COMMA T_ID value_list	{hashtbl_insert(hashtbl, $3, NULL, scope);}
-					| T_ID value_list				{hashtbl_insert(hashtbl, $1, NULL, scope);}
+vals:				vals T_COMMA T_ID value_list	{ hashtbl_insert(symbol_table, $3, NULL, scope); }
+					| T_ID value_list				{ hashtbl_insert(symbol_table, $1, NULL, scope); }
 
 value_list:			T_DIVOP values T_DIVOP
 
@@ -162,7 +162,7 @@ constant:			simple_constant
 
 simple_constant:	T_ICONST | T_RCONST | T_LCONST | T_CCONST
 
-complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN
+complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN { $$ = create_complex($2, $5); }
 
 statements:			statements labeled_statement
 					| labeled_statement
@@ -187,10 +187,10 @@ simple_statement:	assignment
 assignment:			variable T_ASSIGN expression
 					| variable T_ASSIGN T_STRING
 
-variable:			variable T_DOT T_ID					{hashtbl_insert(hashtbl, $3, NULL, scope);}
+variable:			variable T_DOT T_ID					{ hashtbl_insert(symbol_table, $3, NULL, scope); }
 					| variable T_LPAREN expressions T_RPAREN
 					| T_LISTFUNC T_LPAREN expression T_RPAREN
-					| T_ID								{hashtbl_insert(hashtbl, $1, NULL, scope);}
+					| T_ID								{ hashtbl_insert(symbol_table, $1, NULL, scope); }
 
 expressions:		expressions T_COMMA expression
 					| expression
@@ -217,14 +217,14 @@ listexpression:		T_LBRACK expressions T_RBRACK
 					| T_LBRACK T_RBRACK
 
 goto_statement:		T_GOTO label
-					| T_GOTO T_ID T_COMMA T_LPAREN labels T_RPAREN		{hashtbl_insert(hashtbl, $2, NULL, scope);}
+					| T_GOTO T_ID T_COMMA T_LPAREN labels T_RPAREN		{ hashtbl_insert(symbol_table, $2, NULL, scope); }
 
 labels:				labels T_COMMA label
 					| labels error label { yyerror("Missing seperator between labels"); yyerrok; }
 					| label
 
-if_statement:		T_IF T_LPAREN expression T_RPAREN {scope++;} label T_COMMA label T_COMMA label {hashtbl_get(hashtbl, scope); scope--;}
-					| T_IF T_LPAREN expression T_RPAREN {scope++;} simple_statement{hashtbl_get(hashtbl, scope); scope--;}
+if_statement:		T_IF T_LPAREN expression T_RPAREN label T_COMMA label T_COMMA label
+					| T_IF T_LPAREN expression T_RPAREN simple_statement
 
 subroutine_call:	T_CALL variable
 
@@ -235,7 +235,7 @@ read_list:			read_list T_COMMA read_item
 					| read_item
 
 read_item:			variable
-					| T_LPAREN read_list T_COMMA T_ID T_ASSIGN iter_space T_RPAREN	{hashtbl_insert(hashtbl, $4, NULL, scope);}
+					| T_LPAREN read_list T_COMMA T_ID T_ASSIGN iter_space T_RPAREN	{ hashtbl_insert(symbol_table, $4, NULL, scope); }
 
 iter_space:			expression T_COMMA expression step
 
@@ -246,7 +246,7 @@ write_list:			write_list T_COMMA write_item
 					| write_item
 
 write_item:			expression
-					| T_LPAREN write_list T_COMMA T_ID T_ASSIGN iter_space T_RPAREN		{hashtbl_insert(hashtbl, $4, NULL, scope);}
+					| T_LPAREN write_list T_COMMA T_ID T_ASSIGN iter_space T_RPAREN		{ hashtbl_insert(symbol_table, $4, NULL, scope); }
 					| T_STRING
 
 compound_statement:	branch_statement
@@ -254,20 +254,20 @@ compound_statement:	branch_statement
 
 branch_statement:	T_IF T_LPAREN expression T_RPAREN T_THEN {scope++;} body tail
 
-tail:				T_ELSE {scope--; hashtbl_get(hashtbl, scope); scope++;}  body T_ENDIF {hashtbl_get(hashtbl, scope); scope--;}
-					| T_ENDIF {hashtbl_get(hashtbl, scope); scope--;}
-
-loop_statement:		T_DO T_ID T_ASSIGN iter_space {scope++;}body T_ENDDO	{hashtbl_insert(hashtbl, $2, NULL, scope);hashtbl_get(hashtbl, scope); scope--;}
+tail:				T_ELSE { hashtbl_get(symbol_table, scope); }  body T_ENDIF { hashtbl_get(symbol_table, scope); scope--; }
+					| T_ENDIF {hashtbl_get(symbol_table, scope); scope--;}
+ 
+loop_statement:		T_DO T_ID T_ASSIGN iter_space {scope++;} body T_ENDDO { hashtbl_insert(symbol_table, $2, NULL, scope); hashtbl_get(symbol_table, scope); scope--; }
 
 subprograms:		subprograms subprogram
 					| %empty
 
 subprogram:			header body T_END // The subprograms have global scope, so we do not have to increase the scope variable
 
-header:				type T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN	{hashtbl_insert(hashtbl, $3, NULL, scope);}
-					| T_LIST T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN	{hashtbl_insert(hashtbl, $3, NULL, scope);}
-					| T_SUBROUTINE T_ID T_LPAREN formal_parameters T_RPAREN			{hashtbl_insert(hashtbl, $2, NULL, scope);}
-					| T_SUBROUTINE T_ID											{hashtbl_insert(hashtbl, $2, NULL, scope);}
+header:				type T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN		{ hashtbl_insert(symbol_table, $3, NULL, scope); }
+					| T_LIST T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN	{ hashtbl_insert(symbol_table, $3, NULL, scope); }
+					| T_SUBROUTINE T_ID T_LPAREN formal_parameters T_RPAREN			{ hashtbl_insert(symbol_table, $2, NULL, scope); }
+					| T_SUBROUTINE T_ID												{ hashtbl_insert(symbol_table, $2, NULL, scope); }
 
 formal_parameters:	type vars T_COMMA formal_parameters
 					| type vars
@@ -276,24 +276,27 @@ formal_parameters:	type vars T_COMMA formal_parameters
 
 int main(int argc, char **argv)
 {
-	if(!(hashtbl = hashtbl_create(10, NULL))) {
-        fprintf(stderr, "ERROR: hashtbl_create() failed!\n");
-        exit(EXIT_FAILURE);
-    }
+	// Create a hash table used as the symbol table
+	if(!(symbol_table = hashtbl_create(10, NULL))) {
+		fprintf(stderr, "ERROR: hashtbl_create() failed!\n");
+		exit(EXIT_FAILURE);
+	}
 
+	// Get input file.
 	if (argc > 1) {
 		yyin = fopen(argv[1], "r");
 		if (yyin == NULL) {
-			perror("Error opening file");
+			perror("Error opening file %s", argv[1]);
 			return -1;
 		}
 	}
 	
+	// This is where the magic happens
 	yyparse();
 
-	hashtbl_get(hashtbl, scope); // Retrieve the last table (Scope 0);
-    hashtbl_destroy(hashtbl);
-
+	// Free memory & Cleanup
+	hashtbl_destroy(symbol_table);
 	fclose(yyin);
+
 	return 0;
 }
