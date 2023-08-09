@@ -6,4 +6,7 @@
 // Uncomment this for verbose lectical analysis
 // #define VERBOSE_LEXER
 
+void yyerror(const char *s);
+
+
 #endif

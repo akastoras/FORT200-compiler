@@ -140,6 +140,23 @@ int hashtbl_remove(HASHTBL *hashtbl, const char *key,int scope)
 	return -1;
 }
 
+void *hashtbl_search(HASHTBL *hashtbl, const char *key, int scope)
+{
+	struct hashnode_s *node, *prevnode = NULL;
+	size_t hash = hashtbl->hashfunc(key) % hashtbl->size;
+
+	node = hashtbl->nodes[hash];
+	while(node) {
+		if((!strcmp(node->key, key)) && (node->scope == scope)) {
+			return node->data;
+		}
+		prevnode=node;
+		node=node->next;
+	}
+
+	return NULL;
+}
+
 void *hashtbl_get(HASHTBL *hashtbl, int scope)
 {
 	int rem;

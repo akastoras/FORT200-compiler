@@ -8,7 +8,8 @@
 	#include <math.h>
 	#include <stdbool.h>
 	#include "constants.h"
-	#include "ast.h"
+	#include "lib/ast.h"
+
 	#include "parser.tab.h"
 	
 	#define GET_INT_VALUE(text, base) (strtol(text + 2, NULL, base))
@@ -23,6 +24,10 @@
 	#define IS_STRING(token) (token==T_STRING)
 	#define IS_LISTFUNC(token) (token==T_LISTFUNC)
 	#define IS_EOF(token) (token==T_EOF)
+
+	// Colors
+	#define RED     "\033[31m"      /* Red */
+	#define RESET   "\033[0m"
 	
 	char string_buffer[2*MAX_STRING_LENGTH] = {0};
 	const int string_buffer_size = 2*MAX_STRING_LENGTH;
@@ -157,9 +162,9 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 {ICONST_B}		{ yylval.intval = GET_INT_VALUE(yytext, 2); return print_token(T_ICONST); }
 
  /* Rconst */
-{RCONST_D}		{ yylval.intval = strtod(yytext, NULL); return print_token(T_RCONST); }
-{RCONST_H}		{ yylval.intval = GET_REAL_VALUE(yytext, 16); return print_token(T_RCONST); }
-{RCONST_B}		{ yylval.intval = GET_REAL_VALUE(yytext, 2); return print_token(T_RCONST); }
+{RCONST_D}		{ yylval.rval = strtod(yytext, NULL); return print_token(T_RCONST); }
+{RCONST_H}		{ yylval.rval = GET_REAL_VALUE(yytext, 16); return print_token(T_RCONST); }
+{RCONST_B}		{ yylval.rval = GET_REAL_VALUE(yytext, 2); return print_token(T_RCONST); }
 
  /* Lconst */
 ".TRUE."		{ yylval.lval = true;  return print_token(T_LCONST); }
@@ -171,7 +176,10 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 ".OR."					{ return print_token(T_OROP); }
 ".NOT."					{ return print_token(T_NOTOP); }
 "."([GL][TE]|EQ|NE)"."	{ return print_token(T_RELOP); }
-"+"|"-"					{ return print_token(T_ADDOP); }
+
+"+"						{ yylval.signval = PLUS; return print_token(T_ADDOP); }
+"-"						{ yylval.signval = MINUS; return print_token(T_ADDOP); }
+
 "*"						{ return print_token(T_MULOP); }
 "/"						{ return print_token(T_DIVOP); }
 "**"					{ return print_token(T_POWEROP); }
@@ -339,7 +347,7 @@ void yyerror(const char *s)
 	static int errors = 0;
 	errors++;
 
-	printf("ERROR: %s in line %d\n", s, yylineno);
+	printf(RED "ERROR: " RESET "%s in line %d\n", s, yylineno);
 
 	if (errors > 5) {
 		printf("%d errors encountered. Compilation not possible...\n", errors);

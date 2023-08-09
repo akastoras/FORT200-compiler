@@ -5,17 +5,14 @@
 	#include <string.h>
 	#include <errno.h>
 	#include <stdbool.h>
-	#include "ast.h"
-	#include "hashtbl.h"
+	#include "lib/ast.h"
+	#include "lib/symbol_table.h"
 	
 	#include "parser.tab.h"
 
 	extern FILE *yyin;
 	extern int yylex();
 	extern void yyerror(const char *err);
-
-	HASHTBL *symbol_table;
-	int scope = 0;
 %}
 
 %define parse.error verbose
@@ -27,41 +24,42 @@
 	char			charval;
 	char			*strval;
 
-	AST_Type		*typeval;
+	AST_Sign		signval;
+	AST_Type		typeval;
 	AST_Constant	*constval;
-	AST_Sign		*signval;
+	AST_Values		*values;
 	// AST_Expression	*exprval;
 }
 
 //  optional required  optional  optional
 // %token    <type>    <name>    <number>  "description"
-%token	<strval> T_FUNCTION		"function"
-%token	<strval> T_SUBROUTINE	"subroutine"
-%token	<strval> T_END			"end"
-%token	<strval> T_INTEGER		"int"
-%token	<strval> T_REAL			"real"
-%token	<strval> T_LOGICAL 		"logical"
-%token	<strval> T_CHARACTER 	"char"
-%token	<strval> T_COMPLEX 		"complex"
-%token	<strval> T_RECORD		"record"
-%token	<strval> T_ENDREC		"endrec"
-%token	<strval> T_LIST			"list"
-%token	<strval> T_DATA			"data"
-%token	<strval> T_CONTINUE		"continue"
-%token	<strval> T_GOTO			"goto"
-%token	<strval> T_CALL			"call"
-%token	<strval> T_READ			"read"
-%token	<strval> T_WRITE		"write"
-%token	<strval> T_NEW			"new"
-%token	<strval> T_LENGTH		"length"
-%token	<strval> T_IF			"if" 
-%token	<strval> T_THEN			"then" 
-%token	<strval> T_ELSE			"else"
-%token	<strval> T_ENDIF		"endif"
-%token	<strval> T_DO			"do"
-%token	<strval> T_ENDDO		"enddo"
-%token	<strval> T_STOP			"stop"
-%token	<strval> T_RETURN		"return"
+%token T_FUNCTION	"function"
+%token T_SUBROUTINE	"subroutine"
+%token T_END		"end"
+%token T_INTEGER	"int"
+%token T_REAL		"real"
+%token T_LOGICAL 	"logical"
+%token T_CHARACTER 	"char"
+%token T_COMPLEX 	"complex"
+%token T_RECORD		"record"
+%token T_ENDREC		"endrec"
+%token T_LIST		"list"
+%token T_DATA		"data"
+%token T_CONTINUE	"continue"
+%token T_GOTO		"goto"
+%token T_CALL		"call"
+%token T_READ		"read"
+%token T_WRITE		"write"
+%token T_NEW		"new"
+%token T_LENGTH		"length"
+%token T_IF			"if" 
+%token T_THEN		"then" 
+%token T_ELSE		"else"
+%token T_ENDIF		"endif"
+%token T_DO			"do"
+%token T_ENDDO		"enddo"
+%token T_STOP		"stop"
+%token T_RETURN		"return"
 	
 // ID
 %token	<strval>	T_ID	"id"
@@ -76,36 +74,37 @@
 %token	<strval>	T_STRING	"string"
 
 // Operators
-%token	<strval>	T_OROP		"orop"
-%token	<strval>	T_ANDOP		"andop"
-%token	<strval>	T_NOTOP		"notop"
-%token	<strval>	T_RELOP 	".GT. or .GE. or .LT. or .LE. or .EQ. or NE."
-%token	<strval>	T_ADDOP		"+ or -"
-%token	<strval>	T_MULOP		"mulop"
-%token	<strval>	T_DIVOP		"divop"
-%token	<strval>	T_POWEROP	"powerop"
+%token	T_OROP		"orop"
+%token	T_ANDOP		"andop"
+%token	T_NOTOP		"notop"
+%token	T_RELOP 	".GT. or .GE. or .LT. or .LE. or .EQ. or NE."
+%token	<signval>	T_ADDOP		"+ or -"
+%token	T_MULOP		"mulop"
+%token	T_DIVOP		"divop"
+%token	T_POWEROP	"powerop"
 
 // List Functions
 %token	T_LISTFUNC	"listfunc"
 
 //Other
-%token	<strval>	T_LPAREN	"lparen"
-%token	<strval>	T_RPAREN	"rparen"
-%token	<strval>	T_COMMA		"comma"
-%token	<strval>	T_ASSIGN	"assign"
-%token	<strval>	T_DOT		"dot"
-%token	<strval>	T_COLON		"colon"
-%token	<strval>	T_LBRACK	"lbrack"
-%token	<strval>	T_RBRACK	"rbrack"
+%token	T_LPAREN	"lparen"
+%token	T_RPAREN	"rparen"
+%token	T_COMMA		"comma"
+%token	T_ASSIGN	"assign"
+%token	T_DOT		"dot"
+%token	T_COLON		"colon"
+%token	T_LBRACK	"lbrack"
+%token	T_RBRACK	"rbrack"
 
 %token	T_EOF	0	"EOF"
  
 // Declaring types for non-terminal variables
-%type <strval> program body declarations vars undef_variable dims dim fields field vals value_list values value statements labeled_statement label statement simple_statement assignment variable expressions listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement subprograms subprogram header formal_parameters
+%type <strval> program body declarations vars undef_variable dims dim fields field vals statements labeled_statement label statement simple_statement assignment variable expressions listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement subprograms subprogram header formal_parameters
 %type <typeval> type
-%type <constval> constant simple_constant complex_constant
+%type <constval> constant simple_constant complex_constant value
 %type <signval> sign
-%type <exprval> expression
+%type <values> values value_list
+/* %type <exprval> expression */
 
 
 /* Declaring ascociativities and priorities */
@@ -132,25 +131,25 @@ declarations:		declarations type vars
 					| declarations T_DATA vals
 					| %empty
 
-type:				T_INTEGER		{ $$ = ast_get_type_int(); }
-					| T_REAL		{ $$ = ast_get_type_real(); }
-					| T_LOGICAL 	{ $$ = ast_get_type_logical(); }
-					| T_CHARACTER	{ $$ = ast_get_type_character(); }
-					| T_COMPLEX		{ $$ = ast_get_type_complex(); } 
+type:				T_INTEGER		{ $$ = INT; }
+					| T_REAL		{ $$ = REAL; }
+					| T_LOGICAL 	{ $$ = LOG; }
+					| T_CHARACTER	{ $$ = CHAR; }
+					| T_COMPLEX		{ $$ = CMPLX; } 
 
 vars:				vars T_COMMA undef_variable
 					| vars error undef_variable { yyerror("Missing seperator ',' between variable definitions"); yyerrok; }
 					| undef_variable
 
 undef_variable:		T_LIST undef_variable
-					| T_ID T_LPAREN dims T_RPAREN	{ hashtbl_insert(symbol_table, $1, NULL, scope); }
+					| T_ID T_LPAREN dims T_RPAREN	{ hashtbl_insert(symbol_table, $1, create_entry(), scope); }
 					| T_ID							{ hashtbl_insert(symbol_table, $1, NULL, scope); }
 
 dims:				dims T_COMMA dim
 					| dim
 
-dim:				T_ICONST 
-					| T_ID							{ hashtbl_insert(symbol_table, $1, NULL, scope); }
+dim:				T_ICONST
+					| T_ID
 
 fields:				fields field
 					| field
@@ -158,22 +157,24 @@ fields:				fields field
 field:				type vars
 					| T_RECORD fields T_ENDREC vars
 
-vals:				vals T_COMMA T_ID value_list	{ hashtbl_insert(symbol_table, $3, NULL, scope); }
-					| T_ID value_list				{ hashtbl_insert(symbol_table, $1, NULL, scope); }
+// Value declerations, typechecking must be done
+vals:				vals T_COMMA T_ID value_list { $$ = ast_insert_val_to_vals($1, $3, $4); }
+					| T_ID value_list { $$ = ast_insert_val_to_vals(NULL, $1, $2); }
 
-value_list:			T_DIVOP values T_DIVOP
+// Propagate the values to value_list
+value_list:			T_DIVOP values T_DIVOP { $$ = $2; ast_print_values($$); }
 
-values:				values T_COMMA value
-					| value
+// Form an array for values
+values:				values T_COMMA value { $$ = ast_insert_value_to_values($1, $3); }
+					| value { $$ = ast_insert_value_to_values(NULL, $1); }
 
-// Get value from sign and constant
-// make sure that the constant type takes a sign
-value:				sign constant
-					| T_STRING
+// Get value from sign and constant make sure that the constant type takes a sign
+value:				sign constant { $$ = ast_get_value($1, $2); }
+					| T_STRING { $$ = ast_get_string($1); }
 
-// Get sign as NONE, POSITIVE, or NEGATIVE
+// Get sign as NONE, PLUS, or MINUS
 sign:				T_ADDOP { $$ = ast_get_sign($1); }
-					| %empty { $$ = ast_get_sign(NULL); }
+					| %empty { $$ = ast_get_sign(NONE); }
 
 // In constant just propagate the value of simple or complex constant
 constant:			simple_constant { $$ = $1; }
@@ -186,7 +187,8 @@ simple_constant:	T_ICONST { $$ = ast_get_ICONST($1); }
 					| T_CCONST { $$ = ast_get_CCONST($1); }
 
 // Give the complex type as well as the real and imaginary values of the complex number
-complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN { $$ = ast_get_CMPLX($2, $5); }
+complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN { $$ = ast_get_CMPLX($2, $4, $5); }
+
 statements:			statements labeled_statement
 					| labeled_statement
 
@@ -240,7 +242,7 @@ listexpression:		T_LBRACK expressions T_RBRACK
 					| T_LBRACK T_RBRACK
 
 goto_statement:		T_GOTO label
-					| T_GOTO T_ID T_COMMA T_LPAREN labels T_RPAREN		{ hashtbl_insert(symbol_table, $2, NULL, scope); }
+					| T_GOTO T_ID T_COMMA T_LPAREN labels T_RPAREN	{ hashtbl_insert(symbol_table, $2, NULL, scope); }
 
 labels:				labels T_COMMA label
 					| labels error label { yyerror("Missing seperator between labels"); yyerrok; }
@@ -275,12 +277,12 @@ write_item:			expression
 compound_statement:	branch_statement
 					| loop_statement
 
-branch_statement:	T_IF T_LPAREN expression T_RPAREN T_THEN {scope++;} body tail
+branch_statement:	T_IF T_LPAREN expression T_RPAREN T_THEN { stbl_increase_scope(); } body tail
 
-tail:				T_ELSE { hashtbl_get(symbol_table, scope); }  body T_ENDIF { hashtbl_get(symbol_table, scope); scope--; }
-					| T_ENDIF {hashtbl_get(symbol_table, scope); scope--;}
- 
-loop_statement:		T_DO T_ID T_ASSIGN iter_space {scope++;} body T_ENDDO { hashtbl_insert(symbol_table, $2, NULL, scope); hashtbl_get(symbol_table, scope); scope--; }
+tail:				T_ELSE { hashtbl_get(symbol_table, scope); }  body T_ENDIF { hashtbl_get(symbol_table, scope); stbl_decrease_scope(); }
+					| T_ENDIF { hashtbl_get(symbol_table, scope); stbl_decrease_scope(); }
+
+loop_statement:		T_DO T_ID T_ASSIGN iter_space {stbl_increase_scope();} body T_ENDDO { hashtbl_insert(symbol_table, $2, NULL, scope); hashtbl_get(symbol_table, scope); stbl_decrease_scope(); }
 
 subprograms:		subprograms subprogram
 					| %empty

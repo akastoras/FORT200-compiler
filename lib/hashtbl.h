@@ -36,6 +36,7 @@ HASHTBL *hashtbl_create(size_t size, size_t (*hashfunc)(const char *));
 void hashtbl_destroy(HASHTBL *hashtbl);
 int hashtbl_insert(HASHTBL *hashtbl, const char *key, void *data, int scope);
 int hashtbl_remove(HASHTBL *hashtbl, const char *key,int scope);
+void *hashtbl_search(HASHTBL *hashtbl, const char *key, int scope);
 void *hashtbl_get(HASHTBL *hashtbl, int scope);
 
 #endif
