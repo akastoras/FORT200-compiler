@@ -53,3 +53,14 @@ new objects for AST nodes.
 #### TODO:
 Check for more errors in symbol table inserts. (vals)
 Create new files semantics.c/h for implementing semantic rules
+
+### Session 6 (Thanos & Tolis & Spyros)
+
+1. Added some AST nodes for variables
+2. Added semantic check for types for variable initialization
+3. Began symbol table library for hash table wrappers
+More info in the comments :D
+
+#### TODO: 
+Finish the AST of declerations
+Continue the symbol_table library with creators
