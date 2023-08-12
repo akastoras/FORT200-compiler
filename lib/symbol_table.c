@@ -1,23 +1,23 @@
 #include "symbol_table.h"
+#include <stdbool.h>
 #include <assert.h>
 
 HASHTBL *symbol_table;
 int scope = 0;
 
-// bool stbl_insert_variable(type_t type, int dims, STBL_Variable **fields)
-// {
-// 	STBL_Entry *entry = safe_malloc(sizeof(STBL_Entry));
-// 	entry->entry_type = VARIABLE;
-	// entry->variable = safe_malloc(sizeof(STBL_Variable));
-	// entry->variable->type = type;
-	// entry->variable->dims = dims;
+// Insert variable id to the symbol table
+bool stbl_insert_variable(const char *key, AST_Dims *dims)
+{
+	// Create a new entry for the variable with the name id
+	STBL_Entry *entry = safe_malloc(sizeof(STBL_Entry));
+	entry->entry_type = VARIABLE;
+	entry->variable = safe_malloc(sizeof(STBL_Variable));
+	entry->variable->dims = dims;
 
-	// if (type == REC) {
-	// 	entry->variable->fields = fields
-	// }
-// }
+	return (hashtbl_insert(symbol_table, key, entry, scope) == 0);
+}
 
-// // Create a sub
+// Create a sub
 // bool stbl_insert_subprogram()
 // {
 
@@ -50,7 +50,7 @@ STBL_Entry *stbl_search_scope(const char *key)
 // Search for a variable in the symbol table
 STBL_Entry *stbl_search_variable(const char *key)
 {
-	STBL_Entry *data;
+	STBL_Entry *data = NULL;
 	
 	// Search for a variable in every scope except the first
 	// since FORT200 does not support global variables
@@ -63,6 +63,20 @@ STBL_Entry *stbl_search_variable(const char *key)
 	}
 
 	return data;
+}
+
+// Search for an id used as a dimension
+int stbl_get_dim(const char *key)
+{
+	// Ensure the id exists
+	STBL_Entry *data = stbl_search_variable(key);
+	assert(data != NULL);
+
+	// Ensure the id is an integer constant
+	AST_Values *value_list = data->variable->value_list;
+	assert(value_list->size == 1 && value_list->data[0]->type == INT);
+
+	return value_list->data[0]->value.intval;
 }
 
 // Search for a subprogram in the symbol table

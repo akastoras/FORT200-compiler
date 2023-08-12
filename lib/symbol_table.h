@@ -2,6 +2,8 @@
 #define _SYMBOL_TABLE_H_
 
 #include "hashtbl.h"
+#include "ast.h"
+#include <stdbool.h>
 
 /****************************************************/
 /********************** STRUCTS *********************/
@@ -10,9 +12,10 @@
 // Struct for symbol table variable entry
 typedef struct variable {
 	type_t type;
-	int dims;
+	AST_Dims *dims;
 	struct variable **fields;
 	int no_fields;
+	AST_Values *value_list;
 } STBL_Variable;
 
 // Struct for symbol table variable subprogram entry
@@ -36,13 +39,13 @@ typedef struct {
 /********************* FUNCTIONS ********************/
 /****************************************************/
 
-STBL_Entry *stbl_create_entry(char *, type_t, int);
+bool stbl_insert_variable(char *, AST_Dims *);
 int stbl_increase_scope();
 int stbl_decrease_scope();
 void stbl_clear_scope();
 
-STBL_Entry *stbl_search_scope(const char *)
-STBL_Entry *stbl_search_variable(const char *)
+STBL_Entry *stbl_search_scope(const char *);
+STBL_Entry *stbl_search_variable(const char *);
 STBL_Entry *stbl_search_subprogram(const char *);
 
 #endif

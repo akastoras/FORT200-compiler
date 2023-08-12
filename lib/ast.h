@@ -46,18 +46,57 @@ typedef struct {
 	AST_Constant **data;
 } AST_Values;
 
-// Struct representing a the intialization of a variable
+// Struct representing the intialization of a variable
 typedef struct {
 	char *id;
 	AST_Values *value_list;
-} AST_InitVal;
+} init_val_t;
 
 // Struct containing array of pointers to AST_Values
 // used to represent vals
 typedef struct {
 	int size;
-	AST_InitVal **elements;
+	init_val_t **elements;
 } AST_Vals;
+
+// Struct containing info for a dim array
+typedef struct {
+	int size;
+	int *elements;
+} AST_Dims;
+
+// Value representing the type of an undefined variable
+typedef enum {SCALAR, ARRAY, LIST} AST_UndefVar_Type;
+
+// Struct representing an undefined variable. It contains its type, its dimensions
+//  and a pointer to the same struct type. The last is used to create a list
+typedef struct undef_var_t {
+	AST_UndefVar_Type type;
+	AST_Dims *dims;
+	struct undef_var_t *nested_undef_var;
+} AST_UndefVar;
+
+// Struct containing an array of pointers to AST_UndefVar
+// used to represent vars
+typedef struct {
+	int size;
+	AST_UndefVar **elements;
+} AST_Vars;
+
+// Strict containing information about a field.
+// When a field is a record, it holds an array of its subfields
+typedef struct field {
+	type_t type;
+	AST_Vars *vars;
+	int size;
+	struct field **fields;
+} AST_Field;
+
+// Struct containing an array of fields
+typedef struct {
+	int size;
+	AST_Field **elements;
+} AST_Fields;
 
 /****************************************************/
 /********************* FUNCTIONS ********************/
@@ -79,6 +118,14 @@ AST_Constant *ast_get_string(char *);
 AST_Values *ast_insert_value_to_values(AST_Values *, AST_Constant *);
 
 AST_Vals *ast_insert_val_to_vals(AST_Vals *, char *, AST_Values *);
+
+AST_Dims *ast_insert_dim_to_dims(AST_Dims *, int);
+
+AST_UndefVar *ast_get_undef_var(AST_UndefVar_Type, AST_Dims *, AST_UndefVar *);
+
+AST_Vars *ast_insert_var_to_vars(AST_Vars *, AST_UndefVar *);
+
+AST_Field *ast_get_field(type_t, AST_Vars *, AST_Fields *)
 
 void ast_print_values(AST_Values *);
 

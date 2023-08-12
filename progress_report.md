@@ -64,3 +64,8 @@ More info in the comments :D
 #### TODO: 
 Finish the AST of declerations
 Continue the symbol_table library with creators
+
+### Session 7 (Tolis & Spyros)
+
+1. Added ast nodes for all elements used by declarations
+2. Added the function `stbl_get_dim` in symbol_table.c/h for getting the value of an ID used as an array dimension

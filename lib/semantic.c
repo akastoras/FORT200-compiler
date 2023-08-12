@@ -17,5 +17,5 @@ void SEM_signable_constant(AST_Sign sign, AST_Constant *constant)
 // 
 void SEM_typecheck_initVal(char *id, AST_Values *value_list)
 {
-
+	return;
 }

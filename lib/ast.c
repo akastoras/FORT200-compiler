@@ -163,7 +163,10 @@ AST_Vals *ast_insert_val_to_vals(AST_Vals *vals, char *id, AST_Values *value_lis
 {
 	AST_Vals *new_vals;
 
-	SEM_typecheck_initVal(char *id, AST_Values *value_list);
+	// Use hashtbl utilities to check if the variable has been declared
+	// SEM_declaration_check(char *id);
+
+	// SEM_typecheck_initVal(char *id, AST_Values *value_list);
 
 	if(vals == NULL) {
 		// Case of the first value
@@ -178,9 +181,9 @@ AST_Vals *ast_insert_val_to_vals(AST_Vals *vals, char *id, AST_Values *value_lis
 	}
 	
 	// Extend pointer array
-	new_vals->elements = safe_realloc(new_vals->elements, new_vals->size * sizeof(AST_InitVal *));
+	new_vals->elements = safe_realloc(new_vals->elements, new_vals->size * sizeof(init_val_t *));
 	// Allocate memory for InitVal struct
-	new_vals->elements[new_vals->size - 1] = safe_malloc(sizeof(AST_InitVal));
+	new_vals->elements[new_vals->size - 1] = safe_malloc(sizeof(init_val_t));
 	
 	// Update the struct fields
 	new_vals->elements[new_vals->size - 1]->id = id;
@@ -190,9 +193,106 @@ AST_Vals *ast_insert_val_to_vals(AST_Vals *vals, char *id, AST_Values *value_lis
 }
 
 
+AST_Dims *ast_insert_dim_to_dims(AST_Dims *dims, int dim)
+{
+	AST_Dims *new_dims;
 
+	if (dims == NULL) {
+		// Case of the first value
+		new_dims = safe_malloc(sizeof(AST_Dims));
+		new_dims->size = 1;
+		new_dims->elements = NULL;
+	}
+	else {
+		// Case of the other values
+		new_dims = dims;
+		new_dims->size++;
+	}
 
+	// Extend the array with the new element
+	new_dims->elements = safe_realloc(new_dims->elements, new_dims->size * sizeof(int));
+	new_dims->elements[new_dims->size - 1] = dim;
 
+	return new_dims;
+}
+
+// Create AST node for an undefined variable
+AST_UndefVar *ast_get_undef_var(AST_UndefVar_Type type, AST_Dims *dims, AST_UndefVar *nested_undef_var)
+{
+	AST_UndefVar *ret_val = safe_malloc(sizeof(AST_UndefVar));
+	ret_val->type = type;
+	ret_val->dims = dims;
+	ret_val->nested_undef_var = nested_undef_var;
+	
+	return ret_val;
+}
+
+AST_Vars *ast_insert_var_to_vars(AST_Vars *vars, AST_UndefVar *var)
+{
+	AST_Vars *new_vars;
+
+	if (vars == NULL) {
+		// Case of the first value
+		new_vars = safe_malloc(sizeof(AST_Vars));
+		new_vars->size = 1;
+		new_vars->elements = NULL;
+	}
+	else {
+		// Case of the other values
+		new_vars = vars;
+		new_vars->size++;
+	}
+
+	// Extend the array with the new element
+	new_vars->elements = safe_realloc(new_vars->elements, new_vars->size * sizeof(AST_UndefVar *));
+	new_vars->elements[new_vars->size - 1] = var;
+
+	return new_vars;
+}
+
+AST_Fields *ast_insert_field_to_fields(AST_Fields *fields, AST_field *field)
+{
+	AST_Field *new_fields;
+
+	if (fields == NULL) {
+		// Case of the first value
+		new_fields = safe_malloc(sizeof(AST_Fields));
+		new_fields->size = 1;
+		new_fields->elements = NULL;
+	}
+	else {
+		// Case of the other values
+		new_fields = fields;
+		new_fields->size++;
+	}
+
+	// Extend the array with the new element
+	new_fields->elements = safe_realloc(new_fields->elements, new_fields->size * sizeof(AST_Field *));
+	new_fields->elements[new_fields->size - 1] = field;
+
+	return new_fields;
+}
+
+// Get an ast node for a record's field
+AST_Field *ast_get_field(type_t type, AST_Vars *vars, AST_Fields *fields)
+{
+	AST_Field *ret_val = safe_malloc(sizeof(AST_Field));
+	ret_val->type = type;
+	ret_val->vars = vars;
+	
+	// if field is a record it contains subfields that reside in fields
+	if (type == REC && fields != NULL) {
+		ret_val->size = fields->size;
+		ret_val->fields = fields->elements;
+		free(fields)
+	}
+	else {
+		ret_val->size = 0;
+		ret_val->fields = NULL;
+	}
+
+	return ret_val;
+}
 
 
 // Print an AST_Values structure

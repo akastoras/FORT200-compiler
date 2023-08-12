@@ -28,12 +28,7 @@
 	AST_Type		typeval;
 	AST_Constant	*constval;
 	AST_Values		*values;
-	AST_Vals		*vals;
-	AST_Dims		*dims;
-	AST_UndefVar	*undef_var;
-	AST_Vars		*vars;
-	AST_Field		*field;
-	AST_Fields		*fields;
+	// AST_Expression	*exprval;
 }
 
 //  optional required  optional  optional
@@ -104,18 +99,11 @@
 %token	T_EOF	0	"EOF"
  
 // Declaring types for non-terminal variables
-%type <strval> program body declarations statements labeled_statement label statement simple_statement assignment variable expressions listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement subprograms subprogram header formal_parameters
+%type <strval> program body declarations vars undef_variable dims dim fields field vals statements labeled_statement label statement simple_statement assignment variable expressions listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement subprograms subprogram header formal_parameters
 %type <typeval> type
 %type <constval> constant simple_constant complex_constant value
 %type <signval> sign
 %type <values> values value_list
-%type <vals> vals
-%type <intval> dim
-%type <dims> dims
-%type <undef_var> undef_variable
-%type <vars> vars
-%type <field> field
-%type <fields> fields
 /* %type <exprval> expression */
 
 
@@ -147,33 +135,27 @@ type:				T_INTEGER		{ $$ = INT; }
 					| T_REAL		{ $$ = REAL; }
 					| T_LOGICAL 	{ $$ = LOG; }
 					| T_CHARACTER	{ $$ = CHAR; }
-					| T_COMPLEX		{ $$ = CMPLX; }
+					| T_COMPLEX		{ $$ = CMPLX; } 
 
-// Form an array of vars
-vars:				vars T_COMMA undef_variable { $$ = ast_insert_var_to_vars($$, $3); }
+vars:				vars T_COMMA undef_variable
 					| vars error undef_variable { yyerror("Missing seperator ',' between variable definitions"); yyerrok; }
-					| undef_variable 			{ $$ = ast_insert_var_to_vars(NULL, $3); }
+					| undef_variable
 
-// Form an undefined variable. Can be a scalar (?), an array or a list
-undef_variable:		T_LIST undef_variable			{ $$ = ast_get_undef_var(LIST, NULL, $2); }
-					| T_ID T_LPAREN dims T_RPAREN	{ $$ = ast_get_undef_var(ARRAY, $3, NULL); stbl_insert_variable($1, $3); }
-					| T_ID							{ $$ = ast_get_undef_var(SCALAR, NULL, NULL); stbl_insert_variable($1, NULL); }
+undef_variable:		T_LIST undef_variable
+					| T_ID T_LPAREN dims T_RPAREN	{ hashtbl_insert(symbol_table, $1, create_entry(), scope); }
+					| T_ID							{ hashtbl_insert(symbol_table, $1, NULL, scope); }
 
-// Form an array of dims
-dims:				dims T_COMMA dim { $$ = ast_insert_dim_to_dims($1, $3); }
-					| dim { $$ = ast_insert_dim_to_dims(NULL, $1); }
+dims:				dims T_COMMA dim
+					| dim
 
-// Propagate the value to dim. Either directly (ICONST) or from the the symbol table (ID)
-dim:				T_ICONST { $$ = $1.intval; }
-					| T_ID { $$ = stbl_get_dim($1); }
+dim:				T_ICONST
+					| T_ID
 
-// Form an array of fields
-fields:				fields field { $$ = ast_insert_field_to_fields($1, $2); }
-					| field { $$ = ast_insert_field_to_fields(NULL, $1); }
+fields:				fields field
+					| field
 
-// Propagate the variables and their type. If field is a record propagate the array of its subfields as well
-field:				type vars { $$ = ast_get_field($1, $2, NULL); }
-					| T_RECORD fields T_ENDREC vars { $$ = ast_get_field(REC, $4, $2); }
+field:				type vars
+					| T_RECORD fields T_ENDREC vars
 
 // Value declerations, typechecking must be done
 vals:				vals T_COMMA T_ID value_list { $$ = ast_insert_val_to_vals($1, $3, $4); }
