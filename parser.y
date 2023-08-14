@@ -34,6 +34,7 @@
 	AST_Vars		*vars;
 	AST_Field		*field;
 	AST_Fields		*fields;
+	AST_Decls		*declared_variables;
 }
 
 //  optional required  optional  optional
@@ -104,7 +105,7 @@
 %token	T_EOF	0	"EOF"
  
 // Declaring types for non-terminal variables
-%type <strval> program body declarations statements labeled_statement label statement simple_statement assignment variable expressions listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement subprograms subprogram header formal_parameters
+%type <strval> program body statements labeled_statement label statement simple_statement assignment variable expressions listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement subprograms subprogram header formal_parameters
 %type <typeval> type
 %type <constval> constant simple_constant complex_constant value
 %type <signval> sign
@@ -116,6 +117,7 @@
 %type <vars> vars
 %type <field> field
 %type <fields> fields
+%type <declared_variables> declarations
 /* %type <exprval> expression */
 
 
@@ -133,15 +135,16 @@ with specified associativity (left/right/nonassoc) */
 
 %%
 
-program:			body T_END subprograms { hashtbl_get(symbol_table, scope); }
+program:			body T_END subprograms { stbl_clear_scope(); }
 					/* | body error T_EOF { yyerror("Expected keyword 'end' at the end of the program"); yyerrok; } */
 
-body:				declarations statements
+body:				declarations { ast_print_decls($1); } statements
 
-declarations:		declarations type vars
-					| declarations T_RECORD fields T_ENDREC vars
-					| declarations T_DATA vals
-					| %empty
+
+declarations:		declarations type vars { $$ = ast_insert_decl_to_decls($1, $2, NULL, $3); }
+					| declarations T_RECORD fields T_ENDREC vars { $$ = ast_insert_decl_to_decls($1, REC, $3, $5); }
+					| declarations T_DATA vals //{ $$ = ast_insert_init_in_decls($1, $3); }
+					| %empty { $$ = NULL; }
 
 type:				T_INTEGER		{ $$ = INT; }
 					| T_REAL		{ $$ = REAL; }
@@ -152,20 +155,20 @@ type:				T_INTEGER		{ $$ = INT; }
 // Form an array of vars
 vars:				vars T_COMMA undef_variable { $$ = ast_insert_var_to_vars($$, $3); }
 					| vars error undef_variable { yyerror("Missing seperator ',' between variable definitions"); yyerrok; }
-					| undef_variable 			{ $$ = ast_insert_var_to_vars(NULL, $3); }
+					| undef_variable 			{ $$ = ast_insert_var_to_vars(NULL, $1); }
 
-// Form an undefined variable. Can be a scalar (?), an array or a list
-undef_variable:		T_LIST undef_variable			{ $$ = ast_get_undef_var(LIST, NULL, $2); }
-					| T_ID T_LPAREN dims T_RPAREN	{ $$ = ast_get_undef_var(ARRAY, $3, NULL); stbl_insert_variable($1, $3); }
-					| T_ID							{ $$ = ast_get_undef_var(SCALAR, NULL, NULL); stbl_insert_variable($1, NULL); }
+// Form an undefined variable. Can be a scalar, an array or a list
+undef_variable:		T_LIST undef_variable			{ $$ = ast_get_undef_var(LIST, NULL, NULL, $2); }
+					| T_ID T_LPAREN dims T_RPAREN	{ $$ = ast_get_undef_var(ARRAY, $1, $3, NULL); }
+					| T_ID							{ $$ = ast_get_undef_var(SCALAR, $1, NULL, NULL); }
 
 // Form an array of dims
 dims:				dims T_COMMA dim { $$ = ast_insert_dim_to_dims($1, $3); }
 					| dim { $$ = ast_insert_dim_to_dims(NULL, $1); }
 
 // Propagate the value to dim. Either directly (ICONST) or from the the symbol table (ID)
-dim:				T_ICONST { $$ = $1.intval; }
-					| T_ID { $$ = stbl_get_dim($1); }
+dim:				T_ICONST { $$ = $1; }
+					| T_ID { $$ = stbl_get_int_initVal($1); }
 
 // Form an array of fields
 fields:				fields field { $$ = ast_insert_field_to_fields($1, $2); }
@@ -180,8 +183,8 @@ vals:				vals T_COMMA T_ID value_list { $$ = ast_insert_val_to_vals($1, $3, $4);
 					| T_ID value_list { $$ = ast_insert_val_to_vals(NULL, $1, $2); }
 
 // Propagate the values to value_list
-value_list:			T_DIVOP values T_DIVOP { $$ = $2; ast_print_values($$); }
-
+value_list:			T_DIVOP values T_DIVOP { $$ = $2; /*ast_print_values($$);*/ }
+ 
 // Form an array for values
 values:				values T_COMMA value { $$ = ast_insert_value_to_values($1, $3); }
 					| value { $$ = ast_insert_value_to_values(NULL, $1); }
@@ -260,7 +263,7 @@ listexpression:		T_LBRACK expressions T_RBRACK
 					| T_LBRACK T_RBRACK
 
 goto_statement:		T_GOTO label
-					| T_GOTO T_ID T_COMMA T_LPAREN labels T_RPAREN	{ hashtbl_insert(symbol_table, $2, NULL, scope); }
+					| T_GOTO T_ID T_COMMA T_LPAREN labels T_RPAREN
 
 labels:				labels T_COMMA label
 					| labels error label { yyerror("Missing seperator between labels"); yyerrok; }
@@ -278,7 +281,7 @@ read_list:			read_list T_COMMA read_item
 					| read_item
 
 read_item:			variable
-					| T_LPAREN read_list T_COMMA T_ID T_ASSIGN iter_space T_RPAREN	{ hashtbl_insert(symbol_table, $4, NULL, scope); }
+					| T_LPAREN read_list T_COMMA T_ID T_ASSIGN iter_space T_RPAREN
 
 iter_space:			expression T_COMMA expression step
 
@@ -289,7 +292,7 @@ write_list:			write_list T_COMMA write_item
 					| write_item
 
 write_item:			expression
-					| T_LPAREN write_list T_COMMA T_ID T_ASSIGN iter_space T_RPAREN		{ hashtbl_insert(symbol_table, $4, NULL, scope); }
+					| T_LPAREN write_list T_COMMA T_ID T_ASSIGN iter_space T_RPAREN
 					| T_STRING
 
 compound_statement:	branch_statement
@@ -297,20 +300,22 @@ compound_statement:	branch_statement
 
 branch_statement:	T_IF T_LPAREN expression T_RPAREN T_THEN { stbl_increase_scope(); } body tail
 
-tail:				T_ELSE { hashtbl_get(symbol_table, scope); }  body T_ENDIF { hashtbl_get(symbol_table, scope); stbl_decrease_scope(); }
-					| T_ENDIF { hashtbl_get(symbol_table, scope); stbl_decrease_scope(); }
+tail:				T_ELSE { stbl_clear_scope(); }  body T_ENDIF { stbl_clear_scope(); stbl_decrease_scope(); }
+					| T_ENDIF { stbl_clear_scope(); stbl_decrease_scope(); }
 
-loop_statement:		T_DO T_ID T_ASSIGN iter_space {stbl_increase_scope();} body T_ENDDO { hashtbl_insert(symbol_table, $2, NULL, scope); hashtbl_get(symbol_table, scope); stbl_decrease_scope(); }
+loop_statement:		T_DO T_ID T_ASSIGN iter_space { stbl_increase_scope(); } body T_ENDDO
 
 subprograms:		subprograms subprogram
 					| %empty
 
-subprogram:			header body T_END // The subprograms have global scope, so we do not have to increase the scope variable
+// The subprograms have global scope, so we do not have to increase the scope variable
+subprogram:			header body T_END { /* stbl_insert_subprogram($1, $2); */ }
 
-header:				type T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN		{ hashtbl_insert(symbol_table, $3, NULL, scope); }
-					| T_LIST T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN	{ hashtbl_insert(symbol_table, $3, NULL, scope); }
-					| T_SUBROUTINE T_ID T_LPAREN formal_parameters T_RPAREN			{ hashtbl_insert(symbol_table, $2, NULL, scope); }
-					| T_SUBROUTINE T_ID												{ hashtbl_insert(symbol_table, $2, NULL, scope); }
+// AST_Header
+header:				type T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN
+					| T_LIST T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN
+					| T_SUBROUTINE T_ID T_LPAREN formal_parameters T_RPAREN
+					| T_SUBROUTINE T_ID
 
 formal_parameters:	type vars T_COMMA formal_parameters
 					| type vars
@@ -320,10 +325,7 @@ formal_parameters:	type vars T_COMMA formal_parameters
 int main(int argc, char **argv)
 {
 	// Create a hash table used as the symbol table
-	if(!(symbol_table = hashtbl_create(10, NULL))) {
-		fprintf(stderr, "ERROR: hashtbl_create() failed!\n");
-		exit(EXIT_FAILURE);
-	}
+	stbl_create();
 
 	// Get input file.
 	if (argc > 1) {
@@ -340,7 +342,7 @@ int main(int argc, char **argv)
 	yyparse();
 
 	// Free memory & Cleanup
-	hashtbl_destroy(symbol_table);
+	stbl_destroy();
 	fclose(yyin);
 
 	return 0;

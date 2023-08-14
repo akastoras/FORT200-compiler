@@ -69,3 +69,25 @@ Continue the symbol_table library with creators
 
 1. Added ast nodes for all elements used by declarations
 2. Added the function `stbl_get_dim` in symbol_table.c/h for getting the value of an ID used as an array dimension
+
+#### TODO:
+Finish the AST nodes for the declarations
+Finish the basic functions for handling the symbol table (only `stbl_insert_variable` for starters) and combine the ast nodes creation with the symbol table filling in parser.y
+Add some semantic rules (eg. SEM_undef_variable and SEM_for_correct_type)
+
+### Session 8 (Thanos & Ioanna)
+1. Change the UndefVariable struct to include char*id
+2. Given that, in declarations make a struct decl_t that has a signle id declaration such that each struct is connected with a single symbol table entry, declerations are an array of those structs
+3. Remove stbl_get_dim and replace it with a call to stbl_search_variable and another function for the semantic checks (dummy, will be changed to something better)
+4. Finished the symbol_table API and hope to have made it work (no subprograms yet)
+5. Changed UndefVar and removed nested_undef var. Now a list is a single node of UndefVar with a depth representing the nested lists.
+
+#### TODO:
+Add the initialization value (3rd rule of declaration) to the initiVal field of the struct
+Semantic rules!!!!!
+
+#### IMPORTANT TODO:
+Dimentions are integer right now.
+Should they?
+If a dim is ID then is it possible that is has not been initialized yet?
+Think about that and make possible changes.

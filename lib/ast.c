@@ -3,10 +3,11 @@
 /****************************************************/
 #include "ast.h"
 #include "semantic.h"
+#include "symbol_table.h"
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
-
+#include <assert.h>
 
 // Malloc with safety
 void *safe_malloc(size_t size)
@@ -41,7 +42,7 @@ void *safe_realloc(void *ptr, size_t size)
 AST_Constant *ast_get_ICONST(int val)
 {
 	AST_Constant *ret_val = safe_malloc(sizeof(AST_Constant));
-	ret_val->value.intval = val;
+	ret_val->intval = val;
 	ret_val->type = INT;
 
 	return ret_val;
@@ -51,7 +52,7 @@ AST_Constant *ast_get_ICONST(int val)
 AST_Constant *ast_get_RCONST(double val)
 {
 	AST_Constant *ret_val = safe_malloc(sizeof(AST_Constant));
-	ret_val->value.rval = val;
+	ret_val->rval = val;
 	ret_val->type = REAL;
 
 	return ret_val;
@@ -61,7 +62,7 @@ AST_Constant *ast_get_RCONST(double val)
 AST_Constant *ast_get_CCONST(char val)
 {
 	AST_Constant *ret_val = safe_malloc(sizeof(AST_Constant));
-	ret_val->value.charval = val;
+	ret_val->charval = val;
 	ret_val->type = CHAR;
 
 	return ret_val;
@@ -71,7 +72,7 @@ AST_Constant *ast_get_CCONST(char val)
 AST_Constant *ast_get_LCONST(bool val)
 {
 	AST_Constant *ret_val = safe_malloc(sizeof(AST_Constant));
-	ret_val->value.lval = val;
+	ret_val->lval = val;
 	ret_val->type = LOG;
 
 	return ret_val;
@@ -81,16 +82,16 @@ AST_Constant *ast_get_LCONST(bool val)
 AST_Constant *ast_get_CMPLX(double re, AST_Sign im_sign, double im)
 {
 	AST_Constant *ret_val = safe_malloc(sizeof(AST_Constant));
-	ret_val->value.cmplxval.re = re;
+	ret_val->cmplxval.re = re;
 	if (im_sign != NONE) {
-		ret_val->value.cmplxval.im = im * im_sign;
+		ret_val->cmplxval.im = im * im_sign;
 	}
 	else {
-		ret_val->value.cmplxval.im = im;
+		ret_val->cmplxval.im = im;
 	}
 	ret_val->type = CMPLX;
 
-	printf("(%f:%f)\n", ret_val->value.cmplxval.re, ret_val->value.cmplxval.im);
+	printf("(%f:%f)\n", ret_val->cmplxval.re, ret_val->cmplxval.im);
 
 	return ret_val;
 }
@@ -112,14 +113,14 @@ AST_Constant *ast_get_value(AST_Sign sign, AST_Constant *constant)
 	// Update the constant struct if the sign is minus
 	if (sign == MINUS) {
 		if (constant->type == INT) {
-			constant->value.intval = -constant->value.intval;
+			constant->intval = -constant->intval;
 		}
 		else if (constant->type == REAL) {
-			constant->value.rval = -constant->value.rval;
+			constant->rval = -constant->rval;
 		}
 		else {
-			constant->value.cmplxval.re = -constant->value.cmplxval.re;
-			constant->value.cmplxval.im = -constant->value.cmplxval.im;
+			constant->cmplxval.re = -constant->cmplxval.re;
+			constant->cmplxval.im = -constant->cmplxval.im;
 		}
 	}
 
@@ -130,7 +131,7 @@ AST_Constant *ast_get_value(AST_Sign sign, AST_Constant *constant)
 AST_Constant *ast_get_string(char *strval)
 {
 	AST_Constant *ret_val = safe_malloc(sizeof(AST_Constant));
-	ret_val->value.strval = strval;
+	ret_val->strval = strval;
 	ret_val->type = STR;
 	
 	return ret_val;
@@ -144,7 +145,7 @@ AST_Values *ast_insert_value_to_values(AST_Values *values, AST_Constant *value)
 		// Case of the first value
 		new_values = safe_malloc(sizeof(AST_Values));
 		new_values->size = 1;
-		new_values->data = NULL;
+		new_values->elements = NULL;
 	}
 	else {
 		// Case of the other values
@@ -153,8 +154,8 @@ AST_Values *ast_insert_value_to_values(AST_Values *values, AST_Constant *value)
 	}
 
 	// Extend the array with the new element
-	new_values->data = safe_realloc(new_values->data, new_values->size * sizeof(AST_Constant *));
-	new_values->data[new_values->size - 1] = value;
+	new_values->elements = safe_realloc(new_values->elements, new_values->size * sizeof(AST_Constant *));
+	new_values->elements[new_values->size - 1] = value;
 
 	return new_values;
 }
@@ -165,8 +166,6 @@ AST_Vals *ast_insert_val_to_vals(AST_Vals *vals, char *id, AST_Values *value_lis
 
 	// Use hashtbl utilities to check if the variable has been declared
 	// SEM_declaration_check(char *id);
-
-	// SEM_typecheck_initVal(char *id, AST_Values *value_list);
 
 	if(vals == NULL) {
 		// Case of the first value
@@ -217,16 +216,29 @@ AST_Dims *ast_insert_dim_to_dims(AST_Dims *dims, int dim)
 }
 
 // Create AST node for an undefined variable
-AST_UndefVar *ast_get_undef_var(AST_UndefVar_Type type, AST_Dims *dims, AST_UndefVar *nested_undef_var)
+AST_UndefVar *ast_get_undef_var(AST_UndefVar_Type type, char *id, AST_Dims *dims, AST_UndefVar *nested_undef_var)
 {
-	AST_UndefVar *ret_val = safe_malloc(sizeof(AST_UndefVar));
+	AST_UndefVar *ret_val;
+	if (type == LIST) {
+		ret_val = nested_undef_var;
+		assert(id == NULL);
+		ret_val->id = nested_undef_var->id;
+		ret_val->list_depth++;
+	}
+	else {
+		ret_val = safe_malloc(sizeof(AST_UndefVar));
+		assert(nested_undef_var == NULL);
+		ret_val->id = id;
+		ret_val->list_depth = 0;
+	}
+
 	ret_val->type = type;
 	ret_val->dims = dims;
-	ret_val->nested_undef_var = nested_undef_var;
-	
+
 	return ret_val;
 }
 
+// Create AST node for Vars if it didn't exist or add an UndefVar to it
 AST_Vars *ast_insert_var_to_vars(AST_Vars *vars, AST_UndefVar *var)
 {
 	AST_Vars *new_vars;
@@ -250,9 +262,10 @@ AST_Vars *ast_insert_var_to_vars(AST_Vars *vars, AST_UndefVar *var)
 	return new_vars;
 }
 
-AST_Fields *ast_insert_field_to_fields(AST_Fields *fields, AST_field *field)
+// Create AST node for fields if it didn't exist or add a field to it
+AST_Fields *ast_insert_field_to_fields(AST_Fields *fields, AST_Field *field)
 {
-	AST_Field *new_fields;
+	AST_Fields *new_fields;
 
 	if (fields == NULL) {
 		// Case of the first value
@@ -284,7 +297,7 @@ AST_Field *ast_get_field(type_t type, AST_Vars *vars, AST_Fields *fields)
 	if (type == REC && fields != NULL) {
 		ret_val->size = fields->size;
 		ret_val->fields = fields->elements;
-		free(fields)
+		free(fields);
 	}
 	else {
 		ret_val->size = 0;
@@ -294,27 +307,67 @@ AST_Field *ast_get_field(type_t type, AST_Vars *vars, AST_Fields *fields)
 	return ret_val;
 }
 
+// Given an AST_Vars struct break it in 
+// several devl_t structs, one for each id
+AST_Decls *ast_insert_decl_to_decls(AST_Decls *old_decls, type_t type, AST_Fields *fields, AST_Vars *vars)
+{
+	AST_Decls *new_decls;
+	char *id;
+	if (old_decls == NULL) {
+		new_decls = safe_malloc(sizeof(AST_Decls));
+		new_decls->size = 0;
+		new_decls->declarations = NULL;
+	}
+	else{
+		new_decls = old_decls;
+	}
+
+	// Extend the declarations by the number of ids in vars
+	int old_size = new_decls->size;
+	new_decls->size += vars->size;
+	new_decls->declarations = safe_realloc(new_decls->declarations, new_decls->size * sizeof(decl_t *));
+	
+	for (int i = 0; i < vars->size; i++) {
+		new_decls->declarations[old_size + i] = safe_malloc(sizeof(decl_t));
+		new_decls->declarations[old_size + i]->datatype->type = type;
+		new_decls->declarations[old_size + i]->datatype->fields = fields;
+		new_decls->declarations[old_size + i]->variable = vars->elements[i];
+		
+		// Insert in symbol table
+		id = new_decls->declarations[old_size + i]->variable->id;
+		stbl_insert_variable(id, new_decls->declarations[old_size + i]);
+	}
+
+	return new_decls;
+}
+
+
+void ast_print_decls(AST_Decls *)
+{
+	return;
+}
+
 
 // Print an AST_Values structure
 void ast_print_values(AST_Values *values)
 {
 	printf("#-----Values-----#\n");
 	for (int i = 0; i < values->size; i++) {
-		AST_Constant *constant = values->data[i];
+		AST_Constant *constant = values->elements[i];
 		switch (constant->type) {
 			case INT:
-				printf("Integer value %d\n", constant->value.intval); break;
+				printf("Integer value %d\n", constant->intval); break;
 			case LOG:
-				printf("Logical value %s\n", (constant->value.lval) ? "True" : "False"); break;
+				printf("Logical value %s\n", (constant->lval) ? "True" : "False"); break;
 			case REAL:
-				printf("Real value %lf\n", constant->value.rval); break;
+				printf("Real value %lf\n", constant->rval); break;
 			case CHAR:
-				printf("Character value %c\n", constant->value.charval); break;
+				printf("Character value %c\n", constant->charval); break;
 			case STR:
-				printf("String value %s\n", constant->value.strval); break;
+				printf("String value %s\n", constant->strval); break;
 			case CMPLX:
 				printf("Complex value with Re = %lf and Im = %lf\n",
-					constant->value.cmplxval.re, constant->value.cmplxval.im); break;
+					constant->cmplxval.re, constant->cmplxval.im); break;
 			default:
 				printf("Value of unknown type\n");
 		}

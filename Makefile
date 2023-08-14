@@ -2,7 +2,7 @@ CC = gcc
 LEXER = lexer.l
 PARSER = parser.y
 BIN = build/compiler.bin
-OBJFILES = build/parser.tab.o build/lex.yy.o build/hashtbl.o build/ast.o build/semantic.o
+OBJFILES = build/parser.tab.o build/lex.yy.o build/hashtbl.o build/ast.o build/semantic.o build/symbol_table.o 
 CFLAGS = -Wall -g
 LFLAGS = -lm -lfl
 

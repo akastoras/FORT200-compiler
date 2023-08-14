@@ -9,19 +9,7 @@
 /********************** STRUCTS *********************/
 /****************************************************/
 
-// Struct for symbol table variable entry
-typedef struct variable {
-	type_t type;
-	AST_Dims *dims;
-	struct variable **fields;
-	int no_fields;
-	AST_Values *value_list;
-} STBL_Variable;
-
-// Struct for symbol table variable subprogram entry
-typedef struct {
-	void *placeholder;
-} STBL_Subprogram;
+typedef void * header_t; // Placeholder
 
 // Enum for describing the type of a symbol table entry
 typedef enum { VARIABLE, SUBPROGRAM } STBL_EntryType;
@@ -30,8 +18,8 @@ typedef enum { VARIABLE, SUBPROGRAM } STBL_EntryType;
 typedef struct {
 	STBL_EntryType entry_type; // Either VARIABLE or SUBPROGRAM
 	union {
-		STBL_Variable *variable;
-		STBL_Subprogram *subprogram;
+		decl_t *decl;
+		header_t *subprogram;
 	};
 } STBL_Entry;
 
@@ -39,12 +27,14 @@ typedef struct {
 /********************* FUNCTIONS ********************/
 /****************************************************/
 
+void stbl_create();
+void stbl_destroy();
 bool stbl_insert_variable(char *, AST_Dims *);
 int stbl_increase_scope();
 int stbl_decrease_scope();
 void stbl_clear_scope();
 
-STBL_Entry *stbl_search_scope(const char *);
+STBL_Entry *stbl_search_scope(const char *, int);
 STBL_Entry *stbl_search_variable(const char *);
 STBL_Entry *stbl_search_subprogram(const char *);
 

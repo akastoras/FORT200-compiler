@@ -1,18 +1,33 @@
 #include "symbol_table.h"
 #include <stdbool.h>
 #include <assert.h>
+#include <stdio.h>
 
 HASHTBL *symbol_table;
 int scope = 0;
 
+// Wrapper for initialization
+void stbl_create()
+{
+	if(!(symbol_table = hashtbl_create(10, NULL))) {
+		fprintf(stderr, "ERROR: hashtbl_create() failed!\n");
+		exit(EXIT_FAILURE);
+	}
+}
+
+// Wrapper for destruction
+void stbl_destroy()
+{
+	hashtbl_destroy(symbol_table);
+}
+
 // Insert variable id to the symbol table
-bool stbl_insert_variable(const char *key, AST_Dims *dims)
+bool stbl_insert_variable(char *key, decl_t *decl)
 {
 	// Create a new entry for the variable with the name id
 	STBL_Entry *entry = safe_malloc(sizeof(STBL_Entry));
 	entry->entry_type = VARIABLE;
-	entry->variable = safe_malloc(sizeof(STBL_Variable));
-	entry->variable->dims = dims;
+	entry->decl = decl;
 
 	return (hashtbl_insert(symbol_table, key, entry, scope) == 0);
 }
@@ -42,13 +57,13 @@ void stbl_clear_scope()
 }
 
 // Search for an id in a given scope
-STBL_Entry *stbl_search_scope(const char *key)
+STBL_Entry *stbl_search_scope(const char *key, int scope)
 {
 	return hashtbl_search(symbol_table, key, scope);
 }
 
 // Search for a variable in the symbol table
-STBL_Entry *stbl_search_variable(const char *key)
+decl_t *stbl_search_variable(const char *key)
 {
 	STBL_Entry *data = NULL;
 	
@@ -62,28 +77,25 @@ STBL_Entry *stbl_search_variable(const char *key)
 		}
 	}
 
-	return data;
-}
-
-// Search for an id used as a dimension
-int stbl_get_dim(const char *key)
-{
-	// Ensure the id exists
-	STBL_Entry *data = stbl_search_variable(key);
-	assert(data != NULL);
-
-	// Ensure the id is an integer constant
-	AST_Values *value_list = data->variable->value_list;
-	assert(value_list->size == 1 && value_list->data[0]->type == INT);
-
-	return value_list->data[0]->value.intval;
+	return data->decl;
 }
 
 // Search for a subprogram in the symbol table
 STBL_Entry *stbl_search_subprogram(const char *key)
 {
 	// subprograms are in scope 0 and scope 0 has only subprograms
-	STBL_Entry *entry = stbl_search_scope(symbol_table, key, 0);
+	STBL_Entry *entry = stbl_search_scope(key, 0);
 	assert(entry == NULL || entry->entry_type == SUBPROGRAM);
 	return entry;
+}
+
+int stbl_get_int_initVal(char *id)
+{
+	decl_t *decl = stbl_search_variable(id);
+	
+	SEM_check_existing_variable(decl);
+	SEM_check_initial_value_exists(decl);
+	SEM_check_decl_datatype_simple(decl->datatype, INT, id);
+
+	return decl->initial_value->value_list->elements[0].intval;
 }
