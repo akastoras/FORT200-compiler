@@ -135,17 +135,19 @@ with specified associativity (left/right/nonassoc) */
 
 %%
 
-program:			body T_END subprograms { stbl_clear_scope(); }
+program:			{ stbl_increase_scope(); } body T_END { stbl_clear_scope(); } subprograms { stbl_clear_scope(); }
 					/* | body error T_EOF { yyerror("Expected keyword 'end' at the end of the program"); yyerrok; } */
 
-body:				declarations { ast_print_decls($1); } statements
+// Body consisting of variable declarations and statements
+body:				declarations statements { ast_print_decls($1); } 
 
-
+// High-level structure for variable declarations
 declarations:		declarations type vars { $$ = ast_insert_decl_to_decls($1, $2, NULL, $3); }
 					| declarations T_RECORD fields T_ENDREC vars { $$ = ast_insert_decl_to_decls($1, REC, $3, $5); }
-					| declarations T_DATA vals //{ $$ = ast_insert_init_in_decls($1, $3); }
+					| declarations T_DATA vals { ast_insert_init_in_decls($3); }
 					| %empty { $$ = NULL; }
 
+// Get type from integer constant
 type:				T_INTEGER		{ $$ = INT; }
 					| T_REAL		{ $$ = REAL; }
 					| T_LOGICAL 	{ $$ = LOG; }
@@ -168,7 +170,7 @@ dims:				dims T_COMMA dim { $$ = ast_insert_dim_to_dims($1, $3); }
 
 // Propagate the value to dim. Either directly (ICONST) or from the the symbol table (ID)
 dim:				T_ICONST { $$ = $1; }
-					| T_ID { $$ = stbl_get_int_initVal($1); }
+					| T_ID { printf("--> "); $$ = stbl_get_int_initVal($1); }
 
 // Form an array of fields
 fields:				fields field { $$ = ast_insert_field_to_fields($1, $2); }

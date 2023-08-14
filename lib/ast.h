@@ -1,3 +1,4 @@
+
 #ifndef _AST_H_
 #define _AST_H_
 
@@ -85,7 +86,7 @@ typedef struct {
 	AST_UndefVar **elements;
 } AST_Vars;
 
-// Strict containing information about a field.
+// Struct containing information about a field.
 // When a field is a record, it holds an array of its subfields
 typedef struct field {
 	AST_Vars *vars; // Variables with that type
@@ -111,9 +112,10 @@ typedef struct {
 typedef struct {
 	AST_UndefVar *variable; // Many variables (SCALAR, ARRAY or LIST)
 	AST_GeneralType *datatype; // The common datatype of all vars
-	init_val_t *initial_value; // Same index as vars
+	AST_Values *initial_value; // Same index as vars
 } decl_t;
 
+// Struct for declarations tree
 typedef struct {
 	int size;
 	decl_t **declarations;
@@ -146,10 +148,12 @@ AST_UndefVar *ast_get_undef_var(AST_UndefVar_Type, char *, AST_Dims *, AST_Undef
 
 AST_Vars *ast_insert_var_to_vars(AST_Vars *, AST_UndefVar *);
 
+AST_Fields *ast_insert_field_to_fields(AST_Fields *, AST_Field *);
 AST_Field *ast_get_field(type_t, AST_Vars *, AST_Fields *);
 
 AST_Decls *ast_insert_decl_to_decls(AST_Decls *, type_t, AST_Fields *, AST_Vars *);
 
+void ast_insert_init_in_decls(AST_Vals *);
 
 void ast_print_values(AST_Values *);
 void ast_print_decls(AST_Decls *);

@@ -91,8 +91,6 @@ AST_Constant *ast_get_CMPLX(double re, AST_Sign im_sign, double im)
 	}
 	ret_val->type = CMPLX;
 
-	printf("(%f:%f)\n", ret_val->cmplxval.re, ret_val->cmplxval.im);
-
 	return ret_val;
 }
 
@@ -222,7 +220,6 @@ AST_UndefVar *ast_get_undef_var(AST_UndefVar_Type type, char *id, AST_Dims *dims
 	if (type == LIST) {
 		ret_val = nested_undef_var;
 		assert(id == NULL);
-		ret_val->id = nested_undef_var->id;
 		ret_val->list_depth++;
 	}
 	else {
@@ -329,6 +326,7 @@ AST_Decls *ast_insert_decl_to_decls(AST_Decls *old_decls, type_t type, AST_Field
 	
 	for (int i = 0; i < vars->size; i++) {
 		new_decls->declarations[old_size + i] = safe_malloc(sizeof(decl_t));
+		new_decls->declarations[old_size + i]->datatype = safe_malloc(sizeof(AST_GeneralType));
 		new_decls->declarations[old_size + i]->datatype->type = type;
 		new_decls->declarations[old_size + i]->datatype->fields = fields;
 		new_decls->declarations[old_size + i]->variable = vars->elements[i];
@@ -339,6 +337,32 @@ AST_Decls *ast_insert_decl_to_decls(AST_Decls *old_decls, type_t type, AST_Field
 	}
 
 	return new_decls;
+}
+
+// Insert initialization value of variable to its declaration struct
+void ast_insert_init_in_decls(AST_Vals *vals)
+{
+	init_val_t *curr_val;
+	AST_Values *curr_value_list;
+	char *curr_id;
+	decl_t *entry;
+	int error;
+
+	for(int i = 0; i < vals->size; i++){
+		curr_val = vals->elements[i];
+		curr_id = curr_val->id;
+		curr_value_list = curr_val->value_list;
+		
+		// Find decl of variable from symbol table
+		entry = stbl_search_variable(curr_id);
+		error = SEM_check_existing_variable(entry, curr_id);
+		
+		// Function not implemented
+		if (!error)
+			error =	SEM_check_compatible_initialization(entry->datatype, curr_value_list);
+		if (!error)
+			entry->initial_value = curr_value_list;
+	}
 }
 
 

@@ -91,3 +91,6 @@ Dimentions are integer right now.
 Should they?
 If a dim is ID then is it possible that is has not been initialized yet?
 Think about that and make possible changes.
+
+### Σεσσιον 9 (Thanos, Ioanna & Spiros)
+1. Implement ast_insert_init_to_decls

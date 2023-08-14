@@ -29,13 +29,14 @@ typedef struct {
 
 void stbl_create();
 void stbl_destroy();
-bool stbl_insert_variable(char *, AST_Dims *);
+bool stbl_insert_variable(char *, decl_t *);
 int stbl_increase_scope();
 int stbl_decrease_scope();
 void stbl_clear_scope();
 
 STBL_Entry *stbl_search_scope(const char *, int);
-STBL_Entry *stbl_search_variable(const char *);
+decl_t *stbl_search_variable(const char *);
 STBL_Entry *stbl_search_subprogram(const char *);
+int stbl_get_int_initVal(char *id);
 
 #endif

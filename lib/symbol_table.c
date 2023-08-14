@@ -1,4 +1,5 @@
 #include "symbol_table.h"
+#include "semantic.h"
 #include <stdbool.h>
 #include <assert.h>
 #include <stdio.h>
@@ -77,7 +78,10 @@ decl_t *stbl_search_variable(const char *key)
 		}
 	}
 
-	return data->decl;
+	if (data != NULL)
+		return data->decl;
+	else
+		return NULL;
 }
 
 // Search for a subprogram in the symbol table
@@ -92,10 +96,16 @@ STBL_Entry *stbl_search_subprogram(const char *key)
 int stbl_get_int_initVal(char *id)
 {
 	decl_t *decl = stbl_search_variable(id);
-	
-	SEM_check_existing_variable(decl);
-	SEM_check_initial_value_exists(decl);
-	SEM_check_decl_datatype_simple(decl->datatype, INT, id);
+	int error;
 
-	return decl->initial_value->value_list->elements[0].intval;
+	error = SEM_check_existing_variable(decl);
+	if (!error)
+		error = SEM_check_initial_value_exists(decl);
+	if (!error)
+		error = SEM_check_decl_datatype_simple(decl->datatype, INT, id);
+
+	if (!error)
+		return decl->initial_value->elements[0]->intval;
+	else
+		return 1; // A value to continue with compilation
 }

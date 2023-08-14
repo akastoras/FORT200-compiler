@@ -142,7 +142,7 @@ int hashtbl_remove(HASHTBL *hashtbl, const char *key,int scope)
 
 void *hashtbl_search(HASHTBL *hashtbl, const char *key, int scope)
 {
-	struct hashnode_s *node, *prevnode = NULL;
+	struct hashnode_s *node;
 	size_t hash = hashtbl->hashfunc(key) % hashtbl->size;
 
 	node = hashtbl->nodes[hash];
@@ -150,7 +150,6 @@ void *hashtbl_search(HASHTBL *hashtbl, const char *key, int scope)
 		if((!strcmp(node->key, key)) && (node->scope == scope)) {
 			return node->data;
 		}
-		prevnode=node;
 		node=node->next;
 	}
 
@@ -171,18 +170,18 @@ void *hashtbl_get(HASHTBL *hashtbl, int scope)
 		node = hashtbl->nodes[n];
 		while(node) {
 			if(node->scope == scope) {
-				if(HASHTBL_DEBUG && HASHTBL_SHOW_GET){
-					if(HASHTBL_SHOW_GET_AS_TABLE){
-						if(!found){
-							printf("-------------- Scope %-2d ---------------\n", scope);
-							printf("Name------------------ Value-----------\n");
-							found++;
-						}
-						printf("%-22s %-16s\n", node->key, (char*)node->data);
-					}else{
-						printf("HASHTBL_GET():\tSCOPE = %d, KEY = %s,  \tDATA = %s\n", node->scope, node->key, (char*)node->data);
-					}
-				}
+				// if(HASHTBL_DEBUG && HASHTBL_SHOW_GET){
+				// 	if(HASHTBL_SHOW_GET_AS_TABLE){
+				// 		if(!found){
+				// 			printf("-------------- Scope %-2d ---------------\n", scope);
+				// 			printf("Name------------------ Value-----------\n");
+				// 			found++;
+				// 		}
+				// 		printf("%-22s %-16s\n", node->key, (char*)node->data);
+				// 	}else{
+				// 		printf("HASHTBL_GET():\tSCOPE = %d, KEY = %s,  \tDATA = %s\n", node->scope, node->key, (char*)node->data);
+				// 	}
+				// }
 				oldnode = node;
 				node = node->next;
 				rem = hashtbl_remove(hashtbl, oldnode->key, scope);
