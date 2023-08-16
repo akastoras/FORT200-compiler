@@ -17,7 +17,6 @@ build/lex.yy.o: lex.yy.c
 build/%.o: lib/%.c lib/%.h
 	gcc $(CFLAGS) -o $@ -c $< $(LFLAGS)
 
-
 lex.yy.c: $(LEXER) constants.h
 	flex $<
 

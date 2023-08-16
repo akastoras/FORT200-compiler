@@ -87,10 +87,10 @@ Add the initialization value (3rd rule of declaration) to the initiVal field of 
 Semantic rules!!!!!
 
 #### IMPORTANT TODO:
-Dimentions are integer right now.
+Dimensions are integer right now.
 Should they?
 If a dim is ID then is it possible that is has not been initialized yet?
 Think about that and make possible changes.
 
-### Σεσσιον 9 (Thanos, Ioanna & Spiros)
+### Session 9 (Thanos & Ioanna & Spiros)
 1. Implement ast_insert_init_to_decls

@@ -93,12 +93,13 @@ STBL_Entry *stbl_search_subprogram(const char *key)
 	return entry;
 }
 
+// Find and return the initialization value of the given integer variable
 int stbl_get_int_initVal(char *id)
 {
 	decl_t *decl = stbl_search_variable(id);
 	int error;
 
-	error = SEM_check_existing_variable(decl);
+	error = SEM_check_existing_variable(decl, id);
 	if (!error)
 		error = SEM_check_initial_value_exists(decl);
 	if (!error)

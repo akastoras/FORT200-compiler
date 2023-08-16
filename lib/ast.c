@@ -348,7 +348,7 @@ void ast_insert_init_in_decls(AST_Vals *vals)
 	decl_t *entry;
 	int error;
 
-	for(int i = 0; i < vals->size; i++){
+	for(int i = 0; i < vals->size; i++) {
 		curr_val = vals->elements[i];
 		curr_id = curr_val->id;
 		curr_value_list = curr_val->value_list;
@@ -359,7 +359,7 @@ void ast_insert_init_in_decls(AST_Vals *vals)
 		
 		// Function not implemented
 		if (!error)
-			error =	SEM_check_compatible_initialization(entry->datatype, curr_value_list);
+			error =	SEM_check_compatible_initialization(entry, curr_value_list);
 		if (!error)
 			entry->initial_value = curr_value_list;
 	}

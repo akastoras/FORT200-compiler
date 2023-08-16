@@ -135,11 +135,11 @@ with specified associativity (left/right/nonassoc) */
 
 %%
 
-program:			{ stbl_increase_scope(); } body T_END { stbl_clear_scope(); } subprograms { stbl_clear_scope(); }
+program:			{ stbl_increase_scope(); } body T_END { stbl_clear_scope(); stbl_decrease_scope(); } subprograms
 					/* | body error T_EOF { yyerror("Expected keyword 'end' at the end of the program"); yyerrok; } */
 
 // Body consisting of variable declarations and statements
-body:				declarations statements { ast_print_decls($1); } 
+body:				declarations statements { ast_print_decls($1); }
 
 // High-level structure for variable declarations
 declarations:		declarations type vars { $$ = ast_insert_decl_to_decls($1, $2, NULL, $3); }
@@ -170,7 +170,7 @@ dims:				dims T_COMMA dim { $$ = ast_insert_dim_to_dims($1, $3); }
 
 // Propagate the value to dim. Either directly (ICONST) or from the the symbol table (ID)
 dim:				T_ICONST { $$ = $1; }
-					| T_ID { printf("--> "); $$ = stbl_get_int_initVal($1); }
+					| T_ID { $$ = stbl_get_int_initVal($1); }
 
 // Form an array of fields
 fields:				fields field { $$ = ast_insert_field_to_fields($1, $2); }
@@ -305,13 +305,13 @@ branch_statement:	T_IF T_LPAREN expression T_RPAREN T_THEN { stbl_increase_scope
 tail:				T_ELSE { stbl_clear_scope(); }  body T_ENDIF { stbl_clear_scope(); stbl_decrease_scope(); }
 					| T_ENDIF { stbl_clear_scope(); stbl_decrease_scope(); }
 
-loop_statement:		T_DO T_ID T_ASSIGN iter_space { stbl_increase_scope(); } body T_ENDDO
+loop_statement:		T_DO T_ID T_ASSIGN iter_space { stbl_increase_scope(); } body T_ENDDO { stbl_clear_scope(); stbl_decrease_scope(); }
 
 subprograms:		subprograms subprogram
 					| %empty
 
 // The subprograms have global scope, so we do not have to increase the scope variable
-subprogram:			header body T_END { /* stbl_insert_subprogram($1, $2); */ }
+subprogram:			header { stbl_increase_scope(); } body { stbl_clear_scope(); stbl_decrease_scope(); } T_END { /* stbl_insert_subprogram($1, $2); */ }
 
 // AST_Header
 header:				type T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN
