@@ -73,7 +73,7 @@ typedef enum {SCALAR, ARRAY, LIST} AST_UndefVar_Type;
 // Struct representing an undefined variable. It contains its type, its dimensions
 //  and a pointer to the same struct type. The last is used to create a list
 typedef struct undef_var_t {
-	AST_UndefVar_Type type;
+	AST_UndefVar_Type type; // Is never LIST
 	AST_Dims *dims;
 	int list_depth; // No need for linked-list of UndefVars, just keep a counter
 	char *id;
@@ -122,39 +122,84 @@ typedef struct {
 } AST_Decls;
 
 
+typedef void * AST_Statements;
+
+
+typedef enum {SUBROUTINE, FUNCTION} subprogram_type_t;
+
+// Struct for parameters of a function
+typedef struct {
+	int size;
+	struct {
+		type_t type;
+		AST_Vars *vars;
+	} * elements;
+} AST_Parameters;
+
+// Struct for the header of a subprogram
+typedef struct {
+	subprogram_type_t subprogram_type;
+	bool returns_list;
+	type_t ret_type;
+	AST_Parameters *params;
+	char *id;
+} AST_Header;
+
+// Struct consisting of the declarations and statements of AST_Body
+typedef struct {
+	AST_Decls *declarations;
+	AST_Statements *statements;
+} AST_Body;
+
+// Subprogram with the header and body of a subprogram
+typedef struct {
+	AST_Header *header;
+	AST_Body *body;
+} AST_Subprogram;
+
+// Array of subprograms packed with its size
+typedef struct {
+	int size;
+	AST_Subprogram **elements;
+} AST_Subprograms;
+
+// Struct for keeping track of a program with a main
+// and an arbitrary number of subprograms
+typedef struct {
+	AST_Body *main;
+	AST_Subprograms *subprograms;
+} AST_Program;
+
 /****************************************************/
 /********************* FUNCTIONS ********************/
 /****************************************************/
 void *safe_malloc(size_t);
 void *safe_realloc(void *, size_t);
 
+// Declarations Functions
 AST_Constant *ast_get_ICONST(int);
 AST_Constant *ast_get_RCONST(double);
 AST_Constant *ast_get_CCONST(char);
 AST_Constant *ast_get_LCONST(bool);
 AST_Constant *ast_get_CMPLX(double, AST_Sign, double);
-
 AST_Sign ast_get_sign(AST_Sign);
-
 AST_Constant *ast_get_value(AST_Sign, AST_Constant *);
 AST_Constant *ast_get_string(char *);
-
 AST_Values *ast_insert_value_to_values(AST_Values *, AST_Constant *);
-
 AST_Vals *ast_insert_val_to_vals(AST_Vals *, char *, AST_Values *);
 AST_Dims *ast_insert_dim_to_dims(AST_Dims *, int);
-
 AST_UndefVar *ast_get_undef_var(AST_UndefVar_Type, char *, AST_Dims *, AST_UndefVar *);
-
 AST_Vars *ast_insert_var_to_vars(AST_Vars *, AST_UndefVar *);
-
 AST_Fields *ast_insert_field_to_fields(AST_Fields *, AST_Field *);
 AST_Field *ast_get_field(type_t, AST_Vars *, AST_Fields *);
-
 AST_Decls *ast_insert_decl_to_decls(AST_Decls *, type_t, AST_Fields *, AST_Vars *);
-
 void ast_insert_init_in_decls(AST_Vals *);
 
+
+// Program Functions
+AST_Program *ast_get_program(AST_Body *main, AST_Subprograms *subprograms);
+
+// Print Functions
 void ast_print_values(AST_Values *);
 void ast_print_decls(AST_Decls *);
 

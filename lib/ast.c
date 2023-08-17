@@ -32,11 +32,11 @@ void *safe_realloc(void *ptr, size_t size)
 }
 
 /****************************************************/
-/************** FUNCTIONS FOR CONSTANTS *************/
+/********************* FUNCTIONS ********************/
 /****************************************************/
 
 
-/****** Functions for Constants ******/
+/****** Functions for Declarations ******/
 
 // Create ast node for integer constant
 AST_Constant *ast_get_ICONST(int val)
@@ -221,6 +221,7 @@ AST_UndefVar *ast_get_undef_var(AST_UndefVar_Type type, char *id, AST_Dims *dims
 		ret_val = nested_undef_var;
 		assert(id == NULL);
 		ret_val->list_depth++;
+		SEM_check_list_depth(ret_val);
 	}
 	else {
 		ret_val = safe_malloc(sizeof(AST_UndefVar));
@@ -322,9 +323,11 @@ AST_Decls *ast_insert_decl_to_decls(AST_Decls *old_decls, type_t type, AST_Field
 	// Extend the declarations by the number of ids in vars
 	int old_size = new_decls->size;
 	new_decls->size += vars->size;
+	
 	new_decls->declarations = safe_realloc(new_decls->declarations, new_decls->size * sizeof(decl_t *));
 	
 	for (int i = 0; i < vars->size; i++) {
+		SEM_check_duplicate_variable_name(vars->elements[i]->id);
 		new_decls->declarations[old_size + i] = safe_malloc(sizeof(decl_t));
 		new_decls->declarations[old_size + i]->datatype = safe_malloc(sizeof(AST_GeneralType));
 		new_decls->declarations[old_size + i]->datatype->type = type;
@@ -365,6 +368,71 @@ void ast_insert_init_in_decls(AST_Vals *vals)
 	}
 }
 
+
+
+
+/****** Functions for Program & Subprograms ******/
+
+
+AST_Header *ast_get_header(subprogram_type_t subprogram_type, type_t type, bool is_list, char *id, AST_Parameters *params)
+{
+	return NULL;
+}
+
+// Create a subprogram structure
+AST_Subprogram *ast_get_subprogram(AST_Header *header, AST_Body *body)
+{
+	AST_Subprogram *subprogram = safe_malloc(sizeof(AST_Subprogram));
+	subprogram->header = header;
+	subprogram->body = body;
+	return subprogram;
+}
+
+// Create or append to an AST_Subprograms struct with a new AST_Subprogram element
+AST_Subprograms *ast_insert_subprogram_to_subprograms(AST_Subprogram *subprogram, AST_Subprogram *subprogram)
+{
+	AST_Subprograms *new_subprograms;
+
+	if (subprogram == NULL) {
+		// Case of the first value
+		new_subprograms = safe_malloc(sizeof(AST_Subprogram));
+		new_subprograms->size = 1;
+		new_subprograms->elements = NULL;
+	}
+	else {
+		// Case of the other values
+		new_subprograms = subprogram;
+		new_subprograms->size++;
+	}
+
+	// Extend the array with the new element
+	new_subprograms->elements = safe_realloc(new_subprograms->elements, new_subprograms->size * sizeof(AST_Subprogram *));
+	new_subprograms->elements[new_subprograms->size - 1] = subprogram;
+
+	return new_subprograms;
+}
+
+// Create a body structure
+AST_Body *ast_get_body(AST_Decls *decls, AST_Statements *statements)
+{
+	AST_Body *body = safe_malloc(sizeof(AST_Body));
+	body->declarations = decls;
+	body->statements = statements;
+	return body;
+}
+
+// Create the high level structure of a program
+AST_Program *ast_get_program(AST_Body *main, AST_Subprograms *subprograms)
+{
+	AST_Program *prog = safe_malloc(sizeof(AST_Program));
+	prog->main = main;
+	prog->subprograms = subprograms;
+	return prog;
+}
+
+/****************************************************/
+/******************* DEBUG & PRINTS *****************/
+/****************************************************/
 
 void ast_print_decls(AST_Decls *)
 {

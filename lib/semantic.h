@@ -9,5 +9,8 @@ int SEM_check_existing_variable(decl_t *, char *);
 int SEM_check_initial_value_exists(decl_t *);
 int SEM_check_decl_datatype_simple(AST_GeneralType *, type_t, char *);
 int SEM_check_compatible_initialization(decl_t *, AST_Values *);
+int SEM_check_list_depth(AST_UndefVar *);
+int SEM_check_duplicate_variable_name(const char *);
+int SEM_check_initialization_position();
 
 #endif

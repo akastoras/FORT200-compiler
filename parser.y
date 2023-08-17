@@ -6,6 +6,7 @@
 	#include <errno.h>
 	#include <stdbool.h>
 	#include "lib/ast.h"
+	#include "lib/semantic.h"
 	#include "lib/symbol_table.h"
 	
 	#include "parser.tab.h"
@@ -35,6 +36,13 @@
 	AST_Field		*field;
 	AST_Fields		*fields;
 	AST_Decls		*declared_variables;
+	
+	AST_Statements	*statements;
+	AST_Body		*body;
+	AST_Header		*header;
+	AST_Subprogram	*subprogram;
+	AST_Subprograms *subprograms;
+	AST_Program		*program;
 }
 
 //  optional required  optional  optional
@@ -105,7 +113,7 @@
 %token	T_EOF	0	"EOF"
  
 // Declaring types for non-terminal variables
-%type <strval> program body statements labeled_statement label statement simple_statement assignment variable expressions listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement subprograms subprogram header formal_parameters
+%type <strval> labeled_statement label statement simple_statement assignment variable expressions listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement
 %type <typeval> type
 %type <constval> constant simple_constant complex_constant value
 %type <signval> sign
@@ -118,6 +126,14 @@
 %type <field> field
 %type <fields> fields
 %type <declared_variables> declarations
+
+%type <statements> statements;
+%type <body> body;
+%type <header> header;
+%type <vars> formal_parameters
+%type <subprogram> subprogram;
+%type <subprograms> subprograms;
+%type <program> program
 /* %type <exprval> expression */
 
 
@@ -135,16 +151,17 @@ with specified associativity (left/right/nonassoc) */
 
 %%
 
-program:			{ stbl_increase_scope(); } body T_END { stbl_clear_scope(); stbl_decrease_scope(); } subprograms
+// High-level structure of a FORT200 program
+program:			{ stbl_increase_scope(); } body T_END { stbl_clear_scope(); stbl_decrease_scope(); } subprograms { $$ = ast_get_program($2, $5); }
 					/* | body error T_EOF { yyerror("Expected keyword 'end' at the end of the program"); yyerrok; } */
 
 // Body consisting of variable declarations and statements
-body:				declarations statements { ast_print_decls($1); }
+body:				declarations statements { ast_print_decls($1); ast_create_body($1, $2); }
 
 // High-level structure for variable declarations
 declarations:		declarations type vars { $$ = ast_insert_decl_to_decls($1, $2, NULL, $3); }
 					| declarations T_RECORD fields T_ENDREC vars { $$ = ast_insert_decl_to_decls($1, REC, $3, $5); }
-					| declarations T_DATA vals { ast_insert_init_in_decls($3); }
+					| declarations T_DATA { SEM_check_initialization_position(); } vals { ast_insert_init_in_decls($4); }
 					| %empty { $$ = NULL; }
 
 // Get type from integer constant
@@ -212,8 +229,8 @@ simple_constant:	T_ICONST { $$ = ast_get_ICONST($1); }
 // Give the complex type as well as the real and imaginary values of the complex number
 complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN { $$ = ast_get_CMPLX($2, $4, $5); }
 
-statements:			statements labeled_statement
-					| labeled_statement
+statements:			statements labeled_statement { $$ = NULL; }
+					| labeled_statement { $$ = NULL; }
 
 labeled_statement:	label statement
 					| statement
@@ -307,17 +324,17 @@ tail:				T_ELSE { stbl_clear_scope(); }  body T_ENDIF { stbl_clear_scope(); stbl
 
 loop_statement:		T_DO T_ID T_ASSIGN iter_space { stbl_increase_scope(); } body T_ENDDO { stbl_clear_scope(); stbl_decrease_scope(); }
 
-subprograms:		subprograms subprogram
-					| %empty
+subprograms:		subprograms subprogram { $$ = ast_insert_subprogram_to_subprograms($1, $2); }
+					| %empty { $$ = NULL; }
 
 // The subprograms have global scope, so we do not have to increase the scope variable
-subprogram:			header { stbl_increase_scope(); } body { stbl_clear_scope(); stbl_decrease_scope(); } T_END { /* stbl_insert_subprogram($1, $2); */ }
+subprogram:			header { stbl_increase_scope(); } body { stbl_clear_scope(); stbl_decrease_scope(); } T_END { $$ = ast_get_subprogram($1, $3); }
 
 // AST_Header
-header:				type T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN
-					| T_LIST T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN
-					| T_SUBROUTINE T_ID T_LPAREN formal_parameters T_RPAREN
-					| T_SUBROUTINE T_ID
+header:				type T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN { $$ = ast_get_header(FUNCTION, $1, false, $3, $5); }
+					| T_LIST T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN { $$ = ast_get_header(FUNCTION, 0, true, $3, $5); }
+					| T_SUBROUTINE T_ID T_LPAREN formal_parameters T_RPAREN { $$ = ast_get_header(SUBPROGRAM, 0, false, $2, $4); }
+					| T_SUBROUTINE T_ID { $$ = ast_get_header(SUBPROGRAM, 0, false, $2, NULL); }
 
 formal_parameters:	type vars T_COMMA formal_parameters
 					| type vars

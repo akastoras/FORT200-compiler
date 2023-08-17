@@ -35,8 +35,10 @@ int stbl_decrease_scope();
 void stbl_clear_scope();
 
 STBL_Entry *stbl_search_scope(const char *, int);
+STBL_Entry *stbl_search_current_scope(const char *key);
 decl_t *stbl_search_variable(const char *);
 STBL_Entry *stbl_search_subprogram(const char *);
 int stbl_get_int_initVal(char *);
+int stbl_get_curr_scope();
 
 #endif

@@ -21,6 +21,7 @@
 		"string": "c",
 		"unordered_map": "c",
 		"unordered_set": "c",
-		"vector": "c"
+		"vector": "c",
+		"symbol_table.h": "c"
 	}
 }

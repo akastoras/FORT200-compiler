@@ -1,3 +1,4 @@
+integer list list list list list x
 integer x(2),z,i,j, list l
 data x/5,-2,3/,z/.true./
 record integer i,j record logical t,f endrec logic(10) endrec r

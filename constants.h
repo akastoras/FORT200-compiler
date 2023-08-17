@@ -2,7 +2,7 @@
 #define _LEXER_H_
 
 #define MAX_STRING_LENGTH (2048)
-
+#define MAX_LIST_DEPTH (5)
 // Uncomment this for verbose lectical analysis
 // #define VERBOSE_LEXER
 

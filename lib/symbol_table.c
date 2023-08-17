@@ -33,6 +33,11 @@ bool stbl_insert_variable(char *key, decl_t *decl)
 	return (hashtbl_insert(symbol_table, key, entry, scope) == 0);
 }
 
+int stbl_get_curr_scope()
+{
+	return scope;
+}
+
 // Create a sub
 // bool stbl_insert_subprogram()
 // {
@@ -55,6 +60,12 @@ int stbl_decrease_scope()
 void stbl_clear_scope()
 {
 	hashtbl_get(symbol_table, scope);
+}
+
+// Search for an id in a given scope
+STBL_Entry *stbl_search_current_scope(const char *key)
+{
+	return hashtbl_search(symbol_table, key, scope);
 }
 
 // Search for an id in a given scope
@@ -104,7 +115,6 @@ int stbl_get_int_initVal(char *id)
 		error = SEM_check_initial_value_exists(decl);
 	if (!error)
 		error = SEM_check_decl_datatype_simple(decl->datatype, INT, id);
-
 	if (!error)
 		return decl->initial_value->elements[0]->intval;
 	else
