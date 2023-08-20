@@ -153,7 +153,7 @@ with specified associativity (left/right/nonassoc) */
 %%
 
 // High-level structure of a FORT200 program
-program:			{ stbl_increase_scope(); } body T_END { stbl_clear_scope(); stbl_decrease_scope(); } subprograms { $$ = ast_get_program($2, $5); }
+program:			{ stbl_increase_scope(); } body T_END { stbl_clear_scope(); ast_print_body($2, ""); stbl_decrease_scope(); } subprograms { $$ = ast_get_program($2, $5); }
 					/* | body error T_EOF { yyerror("Expected keyword 'end' at the end of the program"); yyerrok; } */
 
 // Body consisting of variable declarations and statements

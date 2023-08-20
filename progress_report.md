@@ -106,3 +106,6 @@ Think about that and make possible changes.
 #### TODO:
 * Function for printing body & Debug declarations
 * Go to statements
+
+
+### Session 12 (Thanos):

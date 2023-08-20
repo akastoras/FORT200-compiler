@@ -4,6 +4,7 @@
 #include "ast.h"
 #include "semantic.h"
 #include "symbol_table.h"
+#include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -228,10 +229,10 @@ AST_UndefVar *ast_get_undef_var(AST_UndefVar_Type type, char *id, AST_Dims *dims
 		assert(nested_undef_var == NULL);
 		ret_val->id = id;
 		ret_val->list_depth = 0;
+		ret_val->type = type;
+		ret_val->dims = dims;
 	}
 
-	ret_val->type = type;
-	ret_val->dims = dims;
 
 	return ret_val;
 }
@@ -491,7 +492,18 @@ AST_Program *ast_get_program(AST_Body *main, AST_Subprograms *subprograms)
 /******************* DEBUG & PRINTS *****************/
 /****************************************************/
 
+// Returns a string with one more tab than the input string
+char *more_tabs(char *tabs)
+{
+	size_t size = strlen(tabs);
+	char *new_tabs = safe_malloc(size+2);
+	if (size!=0)
+		strcpy(tabs, new_tabs);
+	new_tabs[size] = '\t';
+	new_tabs[size+1] = '\0';
 
+	return new_tabs;
+}
 
 char *functype_str[] = {"SUBROUTINE", "FUNCTION"};
 char *type_str[] = {"INTEGER", "LOGICAL", "REAL", "CHARACTER", "STRING", "COMPLEX", "RECORD"};
@@ -531,16 +543,91 @@ void ast_print_header(AST_Header *header)
 	return;
 }
 
-void ast_print_body(AST_Body *)
+// Dummy for printing fields
+void ast_print_fields(AST_Fields *fields, char *tabs)
+{
+	printf("%s\t(printing fields is unsupported)\n", tabs);
+	return;
+}
+
+// Prints type without \n unless it is record
+// for records it prints its fields one line each
+void ast_print_datatype(AST_GeneralType *datatype, char *tabs)
+{
+	printf("%s%s", tabs, type_str[datatype->type]);
+	if (datatype->type == REC) {
+		printf("\n");
+		ast_print_fields(datatype->fields, tabs);
+	}
+}
+
+void ast_print_variable(AST_UndefVar *variable, char *tabs)
+{	
+	printf("%s", tabs);
+	if (variable->list_depth) {
+		printf("list(depth:%d) ", variable->list_depth);
+	}
+
+	printf("%s", variable->id);
+
+	if (variable->type == ARRAY) {
+		printf("(");
+		for (int j = 0; j < variable->dims->size - 1; j++) {
+			printf("%d, ", variable->dims->elements[j]);
+		}    
+		printf("%d)", variable->dims->elements[variable->dims->size-1]);
+	}
+
+	printf("\n");
+}
+
+void ast_print_initial_value(AST_Values *value, char *tabs)
+{
+	printf("%s\t(printing initial value unsupported)\n", tabs);
+	return;
+}
+
+void ast_print_decl(decl_t *decl, char *tabs)
+{
+	ast_print_datatype(decl->datatype, tabs);
+	ast_print_variable(decl->variable, tabs);
+	if (decl->initial_value != NULL)
+		ast_print_initial_value(decl->initial_value, tabs);
+	printf("\n");
+}
+
+void ast_print_decls(AST_Decls *decls, char *tabs)
+{
+	for (int i = 0; i < decls->size; i++) {
+		ast_print_decl(decls->declarations[i], tabs);
+	}
+	return;
+}
+
+void ast_print_statements(AST_Statements *statements, char *tabs)
 {
 	return;
 }
 
+void ast_print_body(AST_Body *body, char *tabs)
+{
+	char *mtabs = more_tabs(tabs);
+
+	printf("%sDeclarations:\n", tabs);
+	ast_print_decls(body->declarations, mtabs);
+	printf("%sStatements:\n", tabs);
+	ast_print_statements(body->statements, mtabs);
+	
+	free(mtabs);
+	return;
+}
+
+// Function for printing a subprogram ast
 void ast_print_subprogram(AST_Subprogram *subgprogram)
 {
 	printf("+++++++++++++++++++++++++++++++++++++\n");
 	ast_print_header(subgprogram->header);
-	ast_print_body(subgprogram->body);
+	ast_print_body(subgprogram->body, "");
 	printf("+++++++++++++++++++++++++++++++++++++\n");
 	return;
 }

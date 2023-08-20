@@ -206,7 +206,8 @@ AST_Program *ast_get_program(AST_Body *main, AST_Subprograms *subprograms);
 
 // Print Functions
 void ast_print_values(AST_Values *);
-void ast_print_subprogram(AST_Subprogram *subgprogram);
+void ast_print_body(AST_Body *, char *);
+void ast_print_subprogram(AST_Subprogram *);
 
 
 #endif
