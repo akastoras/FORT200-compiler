@@ -12,5 +12,7 @@ int SEM_check_compatible_initialization(decl_t *, AST_Values *);
 int SEM_check_list_depth(AST_UndefVar *);
 int SEM_check_duplicate_variable_name(const char *);
 int SEM_check_initialization_position();
+int SEM_check_duplicate_subprogram_name(char *);
+int SEM_check_existing_arguments(AST_Params *, char *);
 
 #endif

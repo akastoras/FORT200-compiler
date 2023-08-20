@@ -11,7 +11,7 @@
 
 // Value representing the type of an expression
 typedef enum {
-	INT, LOG, REAL, CHAR, STR, CMPLX, REC
+	INT=0, LOG, REAL, CHAR, STR, CMPLX, REC
 } type_t;
 
 // Values representing the op used as sign or addop
@@ -68,7 +68,7 @@ typedef struct {
 } AST_Dims;
 
 // Value representing the type of an undefined variable
-typedef enum {SCALAR, ARRAY, LIST} AST_UndefVar_Type;
+typedef enum {SCALAR=0, ARRAY, LIST} AST_UndefVar_Type;
 
 // Struct representing an undefined variable. It contains its type, its dimensions
 //  and a pointer to the same struct type. The last is used to create a list
@@ -113,6 +113,7 @@ typedef struct {
 	AST_UndefVar *variable; // Many variables (SCALAR, ARRAY or LIST)
 	AST_GeneralType *datatype; // The common datatype of all vars
 	AST_Values *initial_value; // Same index as vars
+	bool is_parameter;
 } decl_t;
 
 // Struct for declarations tree
@@ -125,23 +126,20 @@ typedef struct {
 typedef void * AST_Statements;
 
 
-typedef enum {SUBROUTINE, FUNCTION} subprogram_type_t;
+typedef enum {SUBROUTINE=0, FUNCTION} subprogram_type_t;
 
 // Struct for parameters of a function
 typedef struct {
 	int size;
-	struct {
-		type_t type;
-		AST_Vars *vars;
-	} * elements;
-} AST_Parameters;
+	decl_t **elements;
+} AST_Params;
 
 // Struct for the header of a subprogram
 typedef struct {
 	subprogram_type_t subprogram_type;
 	bool returns_list;
 	type_t ret_type;
-	AST_Parameters *params;
+	AST_Params *params;
 	char *id;
 } AST_Header;
 
@@ -197,11 +195,18 @@ void ast_insert_init_in_decls(AST_Vals *);
 
 
 // Program Functions
+AST_Params *ast_insert_param_to_params(AST_Params *old_params, type_t type, AST_Vars *vars);
+AST_Header *ast_get_header(subprogram_type_t subprogram_type, type_t type, bool is_list, char *id, AST_Params *params);
+AST_Subprogram *ast_get_subprogram(AST_Header *header, AST_Body *body);
+AST_Subprograms *ast_insert_subprogram_to_subprograms(AST_Subprograms *subprograms, AST_Subprogram *subprogram);
+AST_Body *ast_get_body(AST_Decls *decls, AST_Statements *statements);
 AST_Program *ast_get_program(AST_Body *main, AST_Subprograms *subprograms);
+
+
 
 // Print Functions
 void ast_print_values(AST_Values *);
-void ast_print_decls(AST_Decls *);
+void ast_print_subprogram(AST_Subprogram *subgprogram);
 
 
 #endif

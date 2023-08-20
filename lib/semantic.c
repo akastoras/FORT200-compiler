@@ -248,3 +248,28 @@ int SEM_check_initialization_position()
 		return 0;
 	}
 }
+
+// Make sure that there is no other subprogram with the same name
+int SEM_check_duplicate_subprogram_name(char *id)
+{
+	STBL_Entry *subprogram = stbl_search_current_scope(id);
+	char buffer[MAX_STRING_LENGTH];
+
+	if (subprogram != NULL) {
+		sprintf(buffer, "Subprogram %s has already been declared", id);
+		yyerror(buffer);
+	}
+	return 0;
+}
+
+// Check that the parameters of a function have at least one parameter
+int SEM_check_existing_arguments(AST_Params *params, char *id)
+{
+	char buffer[MAX_STRING_LENGTH];
+	
+	if (params == NULL || params->size < 1) {
+		sprintf(buffer, "Function %s requires at least one parameters.", id);
+		yyerror(buffer);
+	}
+	return 0;
+}

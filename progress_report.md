@@ -94,3 +94,15 @@ Think about that and make possible changes.
 
 ### Session 9 (Thanos & Ioanna & Spiros)
 1. Implement ast_insert_init_to_decls
+
+### Session 10
+...
+
+### Session 11 (Thanos & Ioanna & Spiros)
+1. Finish high-level structure of program
+2. Compile and debug so far
+3. Begin print functions
+
+#### TODO:
+* Function for printing body & Debug declarations
+* Go to statements

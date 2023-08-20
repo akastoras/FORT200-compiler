@@ -37,6 +37,7 @@
 	AST_Fields		*fields;
 	AST_Decls		*declared_variables;
 	
+	AST_Params		*params;
 	AST_Statements	*statements;
 	AST_Body		*body;
 	AST_Header		*header;
@@ -130,7 +131,7 @@
 %type <statements> statements;
 %type <body> body;
 %type <header> header;
-%type <vars> formal_parameters
+%type <params> formal_parameters;
 %type <subprogram> subprogram;
 %type <subprograms> subprograms;
 %type <program> program
@@ -156,7 +157,7 @@ program:			{ stbl_increase_scope(); } body T_END { stbl_clear_scope(); stbl_decr
 					/* | body error T_EOF { yyerror("Expected keyword 'end' at the end of the program"); yyerrok; } */
 
 // Body consisting of variable declarations and statements
-body:				declarations statements { ast_print_decls($1); ast_create_body($1, $2); }
+body:				declarations statements { $$ = ast_get_body($1, $2); }
 
 // High-level structure for variable declarations
 declarations:		declarations type vars { $$ = ast_insert_decl_to_decls($1, $2, NULL, $3); }
@@ -328,16 +329,17 @@ subprograms:		subprograms subprogram { $$ = ast_insert_subprogram_to_subprograms
 					| %empty { $$ = NULL; }
 
 // The subprograms have global scope, so we do not have to increase the scope variable
-subprogram:			header { stbl_increase_scope(); } body { stbl_clear_scope(); stbl_decrease_scope(); } T_END { $$ = ast_get_subprogram($1, $3); }
+subprogram:			header { stbl_increase_scope(); } body { stbl_clear_scope(); stbl_decrease_scope(); } T_END { $$ = ast_get_subprogram($1, $3); ast_print_subprogram($$); }
 
-// AST_Header
+// Header of a subprogram
 header:				type T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN { $$ = ast_get_header(FUNCTION, $1, false, $3, $5); }
 					| T_LIST T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN { $$ = ast_get_header(FUNCTION, 0, true, $3, $5); }
-					| T_SUBROUTINE T_ID T_LPAREN formal_parameters T_RPAREN { $$ = ast_get_header(SUBPROGRAM, 0, false, $2, $4); }
-					| T_SUBROUTINE T_ID { $$ = ast_get_header(SUBPROGRAM, 0, false, $2, NULL); }
+					| T_SUBROUTINE T_ID T_LPAREN formal_parameters T_RPAREN { $$ = ast_get_header(SUBROUTINE, 0, false, $2, $4); }
+					| T_SUBROUTINE T_ID { $$ = ast_get_header(SUBROUTINE, 0, false, $2, NULL); }
 
-formal_parameters:	type vars T_COMMA formal_parameters
-					| type vars
+// Parameters of a subprogram
+formal_parameters:	type vars T_COMMA formal_parameters { $$ = ast_insert_param_to_params($4, $1, $2); }
+					| type vars { $$ = ast_insert_param_to_params(NULL, $1, $2); }
 
 %%
 

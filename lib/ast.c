@@ -329,6 +329,7 @@ AST_Decls *ast_insert_decl_to_decls(AST_Decls *old_decls, type_t type, AST_Field
 	for (int i = 0; i < vars->size; i++) {
 		SEM_check_duplicate_variable_name(vars->elements[i]->id);
 		new_decls->declarations[old_size + i] = safe_malloc(sizeof(decl_t));
+		new_decls->declarations[old_size + i]->is_parameter = false;
 		new_decls->declarations[old_size + i]->datatype = safe_malloc(sizeof(AST_GeneralType));
 		new_decls->declarations[old_size + i]->datatype->type = type;
 		new_decls->declarations[old_size + i]->datatype->fields = fields;
@@ -373,10 +374,66 @@ void ast_insert_init_in_decls(AST_Vals *vals)
 
 /****** Functions for Program & Subprograms ******/
 
-
-AST_Header *ast_get_header(subprogram_type_t subprogram_type, type_t type, bool is_list, char *id, AST_Parameters *params)
+// Given an AST_Vars struct break it in 
+// several devl_t structs, one for each id
+AST_Params *ast_insert_param_to_params(AST_Params *old_params, type_t type, AST_Vars *vars)
 {
-	return NULL;
+	AST_Params *new_params;
+	char *id;
+	if (old_params == NULL) {
+		new_params = safe_malloc(sizeof(AST_Params));
+		new_params->size = 0;
+		new_params->elements = NULL;
+	}
+	else{
+		new_params = old_params;
+	}
+
+	// Extend the parameters by the number of ids in vars
+	int old_size = new_params->size;
+	
+	new_params->size += vars->size;
+	new_params->elements = safe_realloc(new_params->elements, new_params->size * sizeof(decl_t *));
+	
+	for (int i = 0; i < vars->size; i++) {
+		SEM_check_duplicate_variable_name(vars->elements[i]->id);
+		new_params->elements[old_size + i] = safe_malloc(sizeof(decl_t));
+		new_params->elements[old_size + i]->is_parameter = true;
+		new_params->elements[old_size + i]->variable = safe_malloc(sizeof(AST_UndefVar));
+		new_params->elements[old_size + i]->datatype = safe_malloc(sizeof(AST_GeneralType));
+		new_params->elements[old_size + i]->datatype->type = type;
+		new_params->elements[old_size + i]->datatype->fields = NULL; // No field as parameter
+		new_params->elements[old_size + i]->variable = vars->elements[i];
+		
+		// Insert in symbol table
+		id = new_params->elements[old_size + i]->variable->id;
+		stbl_insert_variable(id, new_params->elements[old_size + i]);
+	}
+
+	return new_params;
+}
+
+// Create a struct for the header of a function
+AST_Header *ast_get_header(subprogram_type_t subprogram_type, type_t type, bool is_list, char *id, AST_Params *params)
+{
+	// Semantic checks
+	if (subprogram_type == FUNCTION) {
+		SEM_check_existing_arguments(params, id);
+	}
+	SEM_check_duplicate_subprogram_name(id);
+	
+	// Struct creation
+	AST_Header *header = safe_malloc(sizeof(AST_Header));
+	header->subprogram_type = subprogram_type;
+	header->id = id;
+	header->params = params;
+
+	if (subprogram_type == FUNCTION) {
+		header->returns_list = is_list;
+		header->ret_type = type;
+	}
+
+	return header;
 }
 
 // Create a subprogram structure
@@ -389,11 +446,11 @@ AST_Subprogram *ast_get_subprogram(AST_Header *header, AST_Body *body)
 }
 
 // Create or append to an AST_Subprograms struct with a new AST_Subprogram element
-AST_Subprograms *ast_insert_subprogram_to_subprograms(AST_Subprogram *subprogram, AST_Subprogram *subprogram)
+AST_Subprograms *ast_insert_subprogram_to_subprograms(AST_Subprograms *subprograms, AST_Subprogram *subprogram)
 {
 	AST_Subprograms *new_subprograms;
 
-	if (subprogram == NULL) {
+	if (subprograms == NULL) {
 		// Case of the first value
 		new_subprograms = safe_malloc(sizeof(AST_Subprogram));
 		new_subprograms->size = 1;
@@ -401,7 +458,7 @@ AST_Subprograms *ast_insert_subprogram_to_subprograms(AST_Subprogram *subprogram
 	}
 	else {
 		// Case of the other values
-		new_subprograms = subprogram;
+		new_subprograms = subprograms;
 		new_subprograms->size++;
 	}
 
@@ -434,11 +491,59 @@ AST_Program *ast_get_program(AST_Body *main, AST_Subprograms *subprograms)
 /******************* DEBUG & PRINTS *****************/
 /****************************************************/
 
-void ast_print_decls(AST_Decls *)
+
+
+char *functype_str[] = {"SUBROUTINE", "FUNCTION"};
+char *type_str[] = {"INTEGER", "LOGICAL", "REAL", "CHARACTER", "STRING", "COMPLEX", "RECORD"};
+
+// Print Info about the header of a unit
+void ast_print_header(AST_Header *header)
+{
+	printf("%s ", functype_str[header->subprogram_type]); 
+	if (header->subprogram_type == FUNCTION) {
+		printf("%s ", header->returns_list ? "LIST" : type_str[header->ret_type]);
+	}
+	printf("%s\n", header->id);
+
+	if (header->params != NULL) {
+		
+		// Iterate over the parameters
+		for (int i = 0; i < header->params->size; i++) {
+			printf("\t%s %s ",
+			type_str[header->params->elements[i]->datatype->type],
+			header->params->elements[i]->variable->id);
+			
+			if (header->params->elements[i]->variable->list_depth)
+				printf("[list depth: %d] ", header->params->elements[i]->variable->list_depth);
+
+			AST_Dims* dims = header->params->elements[i]->variable->dims;
+			if (dims != NULL) {
+				printf("(");
+				for (int j = 0; j < dims->size - 1; j++) {
+					printf("%d, ", dims->elements[j]);
+				}    
+				printf("%d)", dims->elements[dims->size-1]);
+			}
+			printf("\n");
+		}
+	}
+
+	return;
+}
+
+void ast_print_body(AST_Body *)
 {
 	return;
 }
 
+void ast_print_subprogram(AST_Subprogram *subgprogram)
+{
+	printf("+++++++++++++++++++++++++++++++++++++\n");
+	ast_print_header(subgprogram->header);
+	ast_print_body(subgprogram->body);
+	printf("+++++++++++++++++++++++++++++++++++++\n");
+	return;
+}
 
 // Print an AST_Values structure
 void ast_print_values(AST_Values *values)
