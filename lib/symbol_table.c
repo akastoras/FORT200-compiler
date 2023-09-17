@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
+#include <math.h>
 
 HASHTBL *symbol_table;
 int scope = 0;
@@ -22,6 +24,11 @@ void stbl_destroy()
 	hashtbl_destroy(symbol_table);
 }
 
+int stbl_get_curr_scope()
+{
+	return scope;
+}
+
 // Insert variable id to the symbol table
 bool stbl_insert_variable(char *key, decl_t *decl)
 {
@@ -33,16 +40,39 @@ bool stbl_insert_variable(char *key, decl_t *decl)
 	return (hashtbl_insert(symbol_table, key, entry, scope) == 0);
 }
 
-int stbl_get_curr_scope()
+// Create a subprogram in scope 0
+bool stbl_insert_subprogram(char *key, AST_Subprogram *subprogram)
 {
-	return scope;
+	// Create a new entry for the variable with the name id
+	STBL_Entry *entry = safe_malloc(sizeof(STBL_Entry));
+	entry->entry_type = SUBPROGRAM;
+	entry->subprogram = subprogram;
+
+	return (hashtbl_insert(symbol_table, key, entry, 0) == 0);
 }
 
-// Create a sub
-// bool stbl_insert_subprogram()
-// {
+// Converts integer label to its corresponding string
+char *itoa(int num) {
+	int size = (int)((ceil(log10(num))+1)*sizeof(char));
+	char *key = safe_malloc(size*sizeof(char));
+	sprintf(key, "%d", num);
 
-// }
+	return key;
+}
+
+// Insert label to the symbol table
+bool stbl_insert_label(int label, AST_Statement *next_statement)
+{
+	char *key = itoa(label);
+	
+	// Create a new entry for the variable with the name id
+	STBL_Entry *entry = safe_malloc(sizeof(STBL_Entry));
+	entry->entry_type = LABEL;
+	entry->label = safe_malloc(sizeof(label_t));
+	entry->label->next_statement = next_statement;
+
+	return (hashtbl_insert(symbol_table, key, entry, scope) == 0);
+}
 
 // Increase and get for scope variable
 int stbl_increase_scope()
@@ -62,7 +92,15 @@ void stbl_clear_scope()
 	hashtbl_get(symbol_table, scope);
 }
 
-// Search for an id in a given scope
+// Search for a label in the current scope
+label_t *stbl_search_label_in_current_scope(int label)
+{
+	char *key = itoa(label);
+	STBL_Entry *entry = stbl_search_current_scope(key);
+	return ((entry) ? entry->label : NULL);
+}
+
+// Search for an id in the current scope
 STBL_Entry *stbl_search_current_scope(const char *key)
 {
 	return hashtbl_search(symbol_table, key, scope);
@@ -102,21 +140,4 @@ STBL_Entry *stbl_search_subprogram(const char *key)
 	STBL_Entry *entry = stbl_search_scope(key, 0);
 	assert(entry == NULL || entry->entry_type == SUBPROGRAM);
 	return entry;
-}
-
-// Find and return the initialization value of the given integer variable
-int stbl_get_int_initVal(char *id)
-{
-	decl_t *decl = stbl_search_variable(id);
-	int error;
-
-	error = SEM_check_existing_variable(decl, id);
-	if (!error)
-		error = SEM_check_initial_value_exists(decl);
-	if (!error)
-		error = SEM_check_decl_datatype_simple(decl->datatype, INT, id);
-	if (!error)
-		return decl->initial_value->elements[0]->intval;
-	else
-		return 1; // A value to continue with compilation
 }

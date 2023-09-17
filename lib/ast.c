@@ -10,6 +10,14 @@
 #include <stdio.h>
 #include <assert.h>
 
+/***** Globals *****/
+
+int statement_counter = 0;
+
+// Global array with all references to a label
+label_uses_t label_uses = { .size = 0, .elements = NULL };
+
+
 // Malloc with safety
 void *safe_malloc(size_t size)
 {
@@ -190,8 +198,28 @@ AST_Vals *ast_insert_val_to_vals(AST_Vals *vals, char *id, AST_Values *value_lis
 	return new_vals;
 }
 
+// Create dim struct for literal value of dim
+AST_Dim *ast_get_dim_literal(int val)
+{
+	AST_Dim *dim = safe_malloc(sizeof(AST_Dim));
+	dim->type = DIM_LITERAL;
+	dim->val = val;
+	printf("<create:%p>\n", dim);
+	return dim;
+}
 
-AST_Dims *ast_insert_dim_to_dims(AST_Dims *dims, int dim)
+// Create dim struct for variable dim
+AST_Dim *ast_get_dim_variable(char *id)
+{
+	AST_Dim *dim = safe_malloc(sizeof(AST_Dim));
+	dim->type = DIM_VARIABLE;
+	dim->id = id;
+
+	return dim;
+}
+
+// Create or append to dimentions
+AST_Dims *ast_insert_dim_to_dims(AST_Dims *dims, AST_Dim *dim)
 {
 	AST_Dims *new_dims;
 
@@ -208,7 +236,7 @@ AST_Dims *ast_insert_dim_to_dims(AST_Dims *dims, int dim)
 	}
 
 	// Extend the array with the new element
-	new_dims->elements = safe_realloc(new_dims->elements, new_dims->size * sizeof(int));
+	new_dims->elements = safe_realloc(new_dims->elements, new_dims->size * sizeof(AST_Dim *));
 	new_dims->elements[new_dims->size - 1] = dim;
 
 	return new_dims;
@@ -294,12 +322,9 @@ AST_Field *ast_get_field(type_t type, AST_Vars *vars, AST_Fields *fields)
 	
 	// if field is a record it contains subfields that reside in fields
 	if (type == REC && fields != NULL) {
-		ret_val->size = fields->size;
-		ret_val->fields = fields->elements;
-		free(fields);
+		ret_val->fields = fields;
 	}
 	else {
-		ret_val->size = 0;
 		ret_val->fields = NULL;
 	}
 
@@ -312,6 +337,7 @@ AST_Decls *ast_insert_decl_to_decls(AST_Decls *old_decls, type_t type, AST_Field
 {
 	AST_Decls *new_decls;
 	char *id;
+	
 	if (old_decls == NULL) {
 		new_decls = safe_malloc(sizeof(AST_Decls));
 		new_decls->size = 0;
@@ -336,6 +362,11 @@ AST_Decls *ast_insert_decl_to_decls(AST_Decls *old_decls, type_t type, AST_Field
 		new_decls->declarations[old_size + i]->datatype->fields = fields;
 		new_decls->declarations[old_size + i]->variable = vars->elements[i];
 		
+		AST_Dims *dims = new_decls->declarations[old_size + i]->variable->dims;
+		if (dims != NULL) {
+			SEM_check_declared_dims(dims, false);
+		}
+
 		// Insert in symbol table
 		id = new_decls->declarations[old_size + i]->variable->id;
 		stbl_insert_variable(id, new_decls->declarations[old_size + i]);
@@ -370,17 +401,528 @@ void ast_insert_init_in_decls(AST_Vals *vals)
 	}
 }
 
+/****** Functions for Statements ******/
 
+// Insert label_use to label_uses array
+void insert_label_use(int label, AST_Statement **statement_addr)
+{
+	label_uses.size++;
+	label_uses.elements = safe_realloc(label_uses.elements, label_uses.size * sizeof(label_use_t *));
+	label_uses.elements[label_uses.size-1] = safe_malloc(sizeof(label_use_t));
+	label_uses.elements[label_uses.size-1]->min_scope = stbl_get_curr_scope();
+	label_uses.elements[label_uses.size-1]->label = label;
+	// Store address of pointer
+	label_uses.elements[label_uses.size-1]->statement_addr = (AST_Statement**)statement_addr;
+}
+
+// When a label_use is matched to a label, delete it
+void remove_label_use(int index)
+{
+	assert(index < label_uses.size);
+
+	label_uses.size--;
+	free(label_uses.elements[index]);
+	label_uses.elements[index] = label_uses.elements[label_uses.size];
+	
+	if (label_uses.size > 0) {
+		label_uses.elements = safe_realloc(label_uses.elements, label_uses.size * sizeof(label_use_t *));
+	}
+	else {
+		free(label_uses.elements);
+		label_uses.elements = NULL;
+	}
+}
+
+// When closing a scope, match label uses that were created
+// in that scope to labels. Otherwise reduce the min scope
+// variable so they cannot be matched with labels in other 
+// cousin scopes [(children of)^n (parent of)^n-1 parent]
+void match_labels_to_label_uses()
+{
+	int curr_scope = stbl_get_curr_scope();
+
+	for (int i = 0; i < label_uses.size; i++) {
+		label_use_t *label_use = label_uses.elements[i];
+		if (label_use->min_scope == curr_scope) {
+			label_t *label = stbl_search_label_in_current_scope(label_use->label);
+
+			if (label == NULL) {
+				label_use->min_scope--;
+			}
+			else {
+				*(label_use->statement_addr) = label->next_statement;
+				remove_label_use(i);
+			}
+		}
+	}
+}
+
+
+
+// Create struct for a goto with a single label
+AST_Goto *ast_get_independent_goto(int label)
+{
+	AST_Goto *goto_statement = safe_malloc(sizeof(AST_Goto));
+	goto_statement->variable = NULL;
+
+	// Insert the goto statement as a label_use with the statement to be filled later
+	insert_label_use(label, &(goto_statement->statement));
+	return goto_statement;
+}
+
+// AST_Goto *ast_get_computed_goto(char *id, int *labels)
+// {
+// 	AST_Goto *goto_statement = safe_malloc(sizeof(AST_Goto));
+// 	goto_statement->variable = stbl_search_variable();
+// 	return NULL;
+// }
+
+
+// Create the struct of statement
+AST_Statement *ast_get_statement(statement_type_t type, void *ptr)
+{
+	AST_Statement *stmt = safe_malloc(sizeof(AST_Statement));
+	stmt->statement_id = statement_counter++;
+	stmt->type = type;
+	stmt->next = NULL;
+
+
+	if (type == SIMPLE) {
+		stmt->simple = ptr;
+	}
+	else {
+		stmt->compound = ptr;
+	}
+
+	return stmt;
+}
+
+// Create AST node for Statements if it didn't exist or add a Statement to it
+AST_Statements *ast_insert_statement_to_statements(AST_Statements *stmts, AST_Statement *stmt)
+{
+	AST_Statements *new_stmts;
+
+	if (stmts == NULL) {
+		// Case of the first value
+		new_stmts = safe_malloc(sizeof(AST_Statements));
+		new_stmts->head = stmt;
+		new_stmts->tail = stmt;
+	}
+	else {
+		// Case of the other values
+		new_stmts = stmts;
+
+		new_stmts->tail->next = stmt;
+		new_stmts->tail = stmt;
+	}
+
+	return new_stmts;
+}
+
+// Create the struct of a simple statement
+AST_SimpleStatement *ast_get_simple_statement(simple_statement_type_t type, void *ptr)
+{
+	AST_SimpleStatement *stmt = safe_malloc(sizeof(AST_SimpleStatement));
+	stmt->type = type;
+
+	switch (type)
+	{
+		case ASSIGNMENT:
+			stmt->assignment = (AST_Assignment *) ptr;
+		case GOTO:
+			stmt->goto_statement = (AST_Goto *) ptr;
+			break;
+
+		default:
+			break;
+	}
+
+	return stmt;
+}
+
+// Get a variable struct
+AST_Variable *ast_get_variable_id(char *id)
+{	
+	printf("Get variable id %s\n", id);
+	AST_Variable *new_variable = safe_malloc(sizeof(AST_Variable));
+	new_variable->type = V_ID;
+	new_variable->datatype = NULL;
+	new_variable->id = id;
+	
+	return new_variable;
+}
+
+// Search for an id that is a field in a record and return the field and the position/index
+// of the id in the AST_Vars array of the field
+AST_Field* ast_search_field_in_record(AST_GeneralType *datatype, char *field_id, int *position_in_vars)
+{
+	assert(datatype->fields != NULL);
+
+	// Search in all fields of RECORD
+	for (int i = 0; i < datatype->fields->size; i++) {
+		AST_Field *field = datatype->fields->elements[i];
+
+		// Search in all vars of each field
+		for (int j = 0; j < field->vars->size; j++) {
+			AST_UndefVar *var = field->vars->elements[j];
+
+			// Compare strings
+			if (strcmp(var->id, field_id) == 0) {
+				// Return the field and the index of the var
+				*position_in_vars = j;
+				return field;
+			}
+		}
+	}
+
+	return NULL;
+}
+
+// Transforms variables from id to decl
+int ast_variable_id2decl(AST_Variable *variable)
+{	
+	if (variable->type != V_ID) {
+		return 1;
+	}
+
+	decl_t *decl = stbl_search_variable(variable->id);
+
+	if (SEM_check_existing_variable(decl, variable->id)) {
+		return 1;
+	}
+
+	variable->type = V_DECL;
+	variable->decl = decl;
+	variable->datatype = decl->datatype;
+
+	return 0;
+}
+
+// Create a record access node
+AST_Variable *ast_get_variable_rec_access(AST_Variable *rec, char *field_id)
+{
+	int position_in_vars;
+	
+	// If the rec is in ID form change it to decl
+	if (rec->type == V_ID)
+		ast_variable_id2decl(rec);
+
+	// Make sure no rec->type related bug exists here
+	assert(rec->type != V_FUNC_CALL && rec->type != V_ID);
+	
+	SEM_check_decl_datatype_simple(rec->decl->datatype, REC, rec->id);
+	AST_Field* field = ast_search_field_in_record(rec->decl->datatype, field_id, &position_in_vars);
+	
+	if (SEM_check_existing_record_field(field, rec->id, field_id)) {
+		return NULL;
+	}
+
+	// Create new node for new_variable
+	AST_Variable *new_variable = safe_malloc(sizeof(AST_Variable));
+	
+	// Fill the new_variable contents
+	new_variable->type = V_REC_ACCESS;
+	new_variable->record = rec;
+
+	// Copy datatype of variable
+	AST_GeneralType *new_datatype = safe_malloc(sizeof(AST_GeneralType));
+	new_datatype->type = field->type;
+	new_datatype->fields = field->fields;
+
+	new_variable->datatype = new_datatype;
+
+	// Store the variable field
+	new_variable->field_var = field->vars->elements[position_in_vars];
+
+	return new_variable;
+}
+
+/* Functions for creating expression nodes */
+
+// Create an expression node that is a variable
+AST_Expression *ast_get_expression_var(AST_Variable *variable)
+{
+	if (variable->type == V_ID)
+		ast_variable_id2decl(variable);
+
+	AST_Expression *new_expr = safe_malloc(sizeof(AST_Expression));
+	new_expr->expr_type = EXPR_VARIABLE;
+	new_expr->variable = variable;	
+	new_expr->datatype = variable->datatype;
+	
+	switch (variable->type)
+	{
+	case V_DECL:
+		new_expr->list_depth = variable->decl->variable->list_depth;
+		printf("Create expression from variable->decl: ");
+		ast_print_variable(variable->decl->variable, " ");
+		break;
+	case V_REC_ACCESS:
+		new_expr->list_depth = variable->field_var->list_depth;
+		break;
+	case V_FUNC_CALL:
+		break;
+	case V_ARRAY_ACCESS:
+		break;
+	case V_LISTFUNC:
+		break;
+	default:
+		break;
+	}
+
+	return new_expr;
+}
+
+// Get a constant struct
+AST_Expression *ast_get_constant_expr(AST_Constant *constant)
+{
+	AST_Expression *new_expr = safe_malloc(sizeof(AST_Expression));
+	new_expr->expr_type = EXPR_CONSTANT;
+	new_expr->constant = constant;
+	new_expr->datatype =safe_malloc(sizeof(AST_GeneralType));
+	new_expr->datatype->type = constant->type;
+	new_expr->datatype->fields = NULL;
+
+	printf("Create expression %p from constant with type %d\n", new_expr, constant->type);
+	return new_expr;
+}
+
+// Creates an AST node for a unary expression
+AST_Expression *ast_get_expression_unary(AST_Expression *child, unary_op_t op_type)
+{
+	AST_Expression *new_expr = safe_malloc(sizeof(AST_Expression));
+	new_expr->expr_type = EXPR_UNARY;
+	new_expr->unary.op = op_type;
+	new_expr->unary.child = child;
+	
+	switch (op_type)
+	{
+	case U_PLUS:
+	case U_MINUS:
+		if (SEM_check_expr_datatype(child, O_INTEGER | O_REAL | O_COMPLEX))
+			return NULL;
+		new_expr->datatype = child->datatype;
+		break;
+	case U_NOT:
+		if (SEM_check_expr_datatype(child, O_LOGICAL))
+			return NULL;
+		new_expr->datatype = child->datatype;
+		break;
+	case U_LENGTH:
+		if (SEM_check_list(child))
+			return NULL;
+		new_expr->datatype = safe_malloc(sizeof(AST_GeneralType));
+		new_expr->datatype->type = INT;
+		new_expr->datatype->fields = NULL;
+		break;
+	case U_NEW:
+		new_expr->datatype = child->datatype;
+		new_expr->list_depth = child->list_depth + 1;
+		break;
+	default:
+		break;
+	}
+
+	return new_expr;
+}
+
+// Create unary expression for notop
+AST_Expression *ast_get_expression_unary_notop(AST_Expression *child)
+{
+	return ast_get_expression_unary(child, U_NOT);
+}
+
+// Create unary expression for addop
+AST_Expression *ast_get_expression_unary_addop(AST_Expression *child, AST_Sign sign)
+{
+	if (sign == 1)
+		return ast_get_expression_unary(child, U_PLUS);
+	else
+		return ast_get_expression_unary(child, U_MINUS);
+}
+
+// Create unary expression for addop
+AST_Expression *ast_get_expression_unary_length(AST_Expression *child)
+{
+	return ast_get_expression_unary(child, U_LENGTH);
+}
+
+// Create unary expression for addop
+AST_Expression *ast_get_expression_unary_new(AST_Expression *child)
+{
+	return ast_get_expression_unary(child, U_NEW);
+}
+
+// Creates an AST node for a binary expression
+AST_Expression *ast_get_expression_binary(binary_op_t operation, AST_Expression *child1, AST_Expression *child2)
+{
+	AST_Expression *new_expr = safe_malloc(sizeof(AST_Expression));
+	new_expr->expr_type = EXPR_BINARY;
+	new_expr->binary.child1 = child1;
+	new_expr->binary.child2 = child2;
+	new_expr->binary.op = operation;
+
+	new_expr->datatype = safe_malloc(sizeof(AST_GeneralType));
+	new_expr->datatype->fields = NULL;
+	
+	switch (operation)
+	{
+	case B_OR:
+	case B_AND:
+		new_expr->datatype->type = LOG;
+		if (SEM_check_expr_datatype(child1, O_LOGICAL | O_INTEGER | O_REAL))
+			return NULL;
+		if (SEM_check_expr_datatype(child2, O_LOGICAL | O_INTEGER | O_REAL))
+			return NULL;
+		break;
+	case B_PLUS:
+	case B_MINUS:
+	case B_MUL:
+	case B_DIV:
+		// Check valid datatypes of children
+		SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_COMPLEX);
+		SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_COMPLEX);
+
+		// Find final expr datatype
+		if (child1->datatype->type == CMPLX || child2->datatype->type == CMPLX) {
+			new_expr->datatype->type = CMPLX;
+		}
+		else if (child1->datatype->type == REAL || child2->datatype->type == REAL){
+			new_expr->datatype->type = REAL;
+		}
+		else {
+			new_expr->datatype->type = INT;
+		}
+	case B_POWER:
+		// Check valid datatypes of children
+		SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+		if(child2->datatype->type == INT) {
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_COMPLEX);
+		}
+		else {
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+		}
+		
+		// Find final expr datatype
+		if(child1->datatype->type == CMPLX) {
+			new_expr->datatype->type = CMPLX;
+		}
+		else if (child1->datatype->type == REAL || child2->datatype->type == REAL){
+			new_expr->datatype->type = REAL;
+		}
+		else {
+			new_expr->datatype->type = INT;
+		}
+	default:
+		break;
+	}
+
+	return new_expr;
+}
+
+// Wrapper of ast_get_expression_binary for orop
+AST_Expression *ast_get_expression_binary_orop(AST_Expression *child1, AST_Expression *child2)
+{
+	return ast_get_expression_binary(B_OR, child1, child2);
+}
+
+// Wrapper of ast_get_expression_binary for andop
+AST_Expression *ast_get_expression_binary_andop(AST_Expression *child1, AST_Expression *child2)
+{	
+	return ast_get_expression_binary(B_AND, child1, child2);
+}
+
+// Wrapper of ast_get_expression_binary for relop
+AST_Expression *ast_get_expression_binary_relop(AST_Relop op, AST_Expression *child1, AST_Expression *child2)
+{
+	return ast_get_expression_binary(B_GT + op, child1, child2);
+}
+
+// Wrapper of ast_get_expression_binary for addop
+AST_Expression *ast_get_expression_binary_addop(AST_Sign sign, AST_Expression *child1, AST_Expression *child2)
+{
+	if (sign == 1)
+		return ast_get_expression_binary(B_PLUS, child1, child2);
+	else
+		return ast_get_expression_binary(B_MINUS, child1, child2);
+}
+
+// Wrapper of ast_get_expression_binary for mulop
+AST_Expression *ast_get_expression_binary_mulop(AST_Expression *child1, AST_Expression *child2)
+{
+	return ast_get_expression_binary(B_MUL, child1, child2);
+}
+
+// Wrapper of ast_get_expression_binary for divop
+AST_Expression *ast_get_expression_binary_divop(AST_Expression *child1, AST_Expression *child2)
+{
+	return ast_get_expression_binary(B_DIV, child1, child2);
+}
+
+// Wrapper of ast_get_expression_binary for pwrop
+AST_Expression *ast_get_expression_binary_pwrop(AST_Expression *child1, AST_Expression *child2)
+{
+	return ast_get_expression_binary(B_POWER, child1, child2);
+}
+
+// Create unary expression for addop
+AST_Expression *ast_get_expression_binary_cmplx(AST_Expression *child1, AST_Expression *child2)
+{
+	return ast_get_expression_binary(B_CMPLX, child1, child2);
+}
+
+
+
+/* Functions for assignents */
+
+// Create an assignment to string
+AST_Assignment *ast_get_assignment_expression(AST_Variable *variable, AST_Expression *expression)
+{
+	if (variable->type == V_ID)
+		ast_variable_id2decl(variable);
+
+	if (SEM_typecheck_variable(variable, expression->datatype->type, "Left hand of assignment")) {
+		return NULL;
+	}
+	printf("Create new assignment node with variable and expression\n");
+
+	AST_Assignment *asmt = safe_malloc(sizeof(AST_Assignment));
+
+	asmt->variable = variable;
+	asmt->type = AS_EXPRESSION;
+	asmt->expression = expression;
+
+	return asmt;
+}
+
+// Create an assignment to string
+AST_Assignment *ast_get_assignment_string(AST_Variable *variable, char *string)
+{
+	if (variable->type == V_ID)
+		ast_variable_id2decl(variable);
+		
+	if (SEM_typecheck_variable(variable, STR, "Left hand of assignment")) {
+		return NULL;
+	}
+
+	AST_Assignment *asmt = safe_malloc(sizeof(AST_Assignment));
+	
+	asmt->variable = variable;
+	asmt->type = AS_STRING;
+	asmt->string = string;
+
+	return asmt;
+}
 
 
 /****** Functions for Program & Subprograms ******/
 
 // Given an AST_Vars struct break it in 
-// several devl_t structs, one for each id
+// several decl_t structs, one for each id
 AST_Params *ast_insert_param_to_params(AST_Params *old_params, type_t type, AST_Vars *vars)
 {
 	AST_Params *new_params;
-	char *id;
+
 	if (old_params == NULL) {
 		new_params = safe_malloc(sizeof(AST_Params));
 		new_params->size = 0;
@@ -400,18 +942,39 @@ AST_Params *ast_insert_param_to_params(AST_Params *old_params, type_t type, AST_
 		SEM_check_duplicate_variable_name(vars->elements[i]->id);
 		new_params->elements[old_size + i] = safe_malloc(sizeof(decl_t));
 		new_params->elements[old_size + i]->is_parameter = true;
-		new_params->elements[old_size + i]->variable = safe_malloc(sizeof(AST_UndefVar));
 		new_params->elements[old_size + i]->datatype = safe_malloc(sizeof(AST_GeneralType));
 		new_params->elements[old_size + i]->datatype->type = type;
 		new_params->elements[old_size + i]->datatype->fields = NULL; // No field as parameter
-		new_params->elements[old_size + i]->variable = vars->elements[i];
-		
-		// Insert in symbol table
-		id = new_params->elements[old_size + i]->variable->id;
-		stbl_insert_variable(id, new_params->elements[old_size + i]);
+		new_params->elements[old_size + i]->variable = vars->elements[vars->size - i - 1];
 	}
 
 	return new_params;
+}
+
+// Ensure that the dimensions of any parameter arrays have been declared
+void ast_check_params(AST_Params *params)
+{
+	decl_t *tmp;
+	char *id;
+
+	// Reverse the parameters for them to be in right order
+	for (int i = 0; i < params->size / 2; i++) {
+		tmp = params->elements[i];
+		params->elements[i] = params->elements[params->size - i - 1];
+		params->elements[params->size - i - 1] = tmp;
+	}
+
+	for (int i = 0; i < params->size; i++) {
+		// Ensure that existing dimensions are declared
+		AST_Dims *dims = params->elements[i]->variable->dims;
+		if (dims != NULL) {
+			SEM_check_declared_dims(dims, true);
+		}
+		
+		// Insert the parameter ids in the symbol table
+		id = params->elements[i]->variable->id;
+		stbl_insert_variable(id, params->elements[i]);
+	}
 }
 
 // Create a struct for the header of a function
@@ -467,6 +1030,9 @@ AST_Subprograms *ast_insert_subprogram_to_subprograms(AST_Subprograms *subprogra
 	new_subprograms->elements = safe_realloc(new_subprograms->elements, new_subprograms->size * sizeof(AST_Subprogram *));
 	new_subprograms->elements[new_subprograms->size - 1] = subprogram;
 
+	char *id = new_subprograms->elements[new_subprograms->size - 1]->header->id;
+	stbl_insert_subprogram(id, new_subprograms->elements[new_subprograms->size - 1]);
+
 	return new_subprograms;
 }
 
@@ -488,6 +1054,8 @@ AST_Program *ast_get_program(AST_Body *main, AST_Subprograms *subprograms)
 	return prog;
 }
 
+
+
 /****************************************************/
 /******************* DEBUG & PRINTS *****************/
 /****************************************************/
@@ -498,7 +1066,7 @@ char *more_tabs(char *tabs)
 	size_t size = strlen(tabs);
 	char *new_tabs = safe_malloc(size+2);
 	if (size!=0)
-		strcpy(tabs, new_tabs);
+		strcpy(new_tabs, tabs);
 	new_tabs[size] = '\t';
 	new_tabs[size+1] = '\0';
 
@@ -532,9 +1100,19 @@ void ast_print_header(AST_Header *header)
 			if (dims != NULL) {
 				printf("(");
 				for (int j = 0; j < dims->size - 1; j++) {
-					printf("%d, ", dims->elements[j]);
-				}    
-				printf("%d)", dims->elements[dims->size-1]);
+					if (dims->elements[j]->type == DIM_LITERAL) {
+						printf("%d, ", dims->elements[j]->val);
+					}
+					else {
+						printf("%s, ", ((decl_t *)dims->elements[j]->decl)->variable->id);
+					}
+				}
+				if (dims->elements[dims->size-1]->type == DIM_LITERAL) {
+					printf("%d)", dims->elements[dims->size-1]->val);
+				}
+				else {
+					printf("%s)", ((decl_t *)dims->elements[dims->size-1]->decl)->variable->id);
+				}
 			}
 			printf("\n");
 		}
@@ -546,7 +1124,41 @@ void ast_print_header(AST_Header *header)
 // Dummy for printing fields
 void ast_print_fields(AST_Fields *fields, char *tabs)
 {
-	printf("%s\t(printing fields is unsupported)\n", tabs);
+	for (int i = 0; i < fields->size; i++) {
+		AST_Field *field = fields->elements[i];
+		printf("%s%s", tabs, type_str[field->type]);
+		
+		if (field->type != REC) {
+
+			AST_Vars *vars = field->vars;
+			for (int j = 0; j < vars->size; j++) {
+				AST_UndefVar *uvar = vars->elements[j];
+				printf(" <LDEPTH-%d> ", uvar->list_depth);
+				
+				if (uvar->type == ARRAY) {
+					printf("<dims:");
+					for (int d = 0; d < uvar->dims->size; d++) {
+						if (uvar->dims->elements[d]->type == DIM_LITERAL) {
+							printf("%d, ", uvar->dims->elements[d]->val);
+						}
+						else {
+							printf("%s, ", uvar->dims->elements[d]->decl->variable->id);
+						}
+					}
+					printf(">");
+				}
+
+				printf("%s", uvar->id);
+			}
+
+			putchar('\n');
+		}
+		else {
+			char *mtabs = more_tabs(tabs);
+			ast_print_fields(field->fields, mtabs);
+		}
+	}
+	printf("%s", tabs);
 	return;
 }
 
@@ -554,15 +1166,17 @@ void ast_print_fields(AST_Fields *fields, char *tabs)
 // for records it prints its fields one line each
 void ast_print_datatype(AST_GeneralType *datatype, char *tabs)
 {
+	char *mtabs = more_tabs(tabs);
+	
 	printf("%s%s", tabs, type_str[datatype->type]);
 	if (datatype->type == REC) {
 		printf("\n");
-		ast_print_fields(datatype->fields, tabs);
+		ast_print_fields(datatype->fields, mtabs);
 	}
 }
 
 void ast_print_variable(AST_UndefVar *variable, char *tabs)
-{	
+{
 	printf("%s", tabs);
 	if (variable->list_depth) {
 		printf("list(depth:%d) ", variable->list_depth);
@@ -573,24 +1187,77 @@ void ast_print_variable(AST_UndefVar *variable, char *tabs)
 	if (variable->type == ARRAY) {
 		printf("(");
 		for (int j = 0; j < variable->dims->size - 1; j++) {
-			printf("%d, ", variable->dims->elements[j]);
-		}    
-		printf("%d)", variable->dims->elements[variable->dims->size-1]);
+			if (variable->dims->elements[j]->type == DIM_LITERAL) {
+				printf("%d, ", variable->dims->elements[j]->val);
+			}
+			else {
+				printf("%s, ", ((decl_t *)variable->dims->elements[j]->decl)->variable->id);
+			}
+		}
+		if (variable->dims->elements[variable->dims->size-1]->type == DIM_LITERAL) {
+			printf("%d)", variable->dims->elements[variable->dims->size-1]->val);
+		}
+		else {
+			printf("%s)", ((decl_t *)variable->dims->elements[variable->dims->size-1]->decl)->variable->id);
+		}
 	}
 
 	printf("\n");
 }
 
-void ast_print_initial_value(AST_Values *value, char *tabs)
+void ast_print_variable_access(AST_Variable *variable, char *tabs) 
+{	
+	char *variable_type_str[] = {"ID", "DECL", "FUNC_CALL", "ARRAY_ACCESS", "REC_ACCESS", "LISTFUNC"};
+	printf("%svariable type: %s\n", tabs, variable_type_str[variable->type]);
+
+	switch(variable->type) {
+		case V_DECL:
+			ast_print_decl(variable->decl, tabs);
+			break;
+		case V_REC_ACCESS:
+			printf("%s(printing record not supported yet)\n", tabs);
+			break;
+		default:
+			break;
+	}
+}
+
+void ast_print_constant(AST_Constant* constant, char *tabs)
 {
-	printf("%s\t(printing initial value unsupported)\n", tabs);
+	switch (constant->type)
+	{
+	case INT:
+		printf("%sINT(%d)\n", tabs, constant->intval);
+		break;
+	case REAL:
+		printf("%sREAL(%lf)\n", tabs, constant->rval);
+		break;
+	case LOG:
+		printf("%sLOG(%d)\n", tabs, constant->lval);
+		break;
+	case CHAR:
+		printf("%sCHAR(%c)\n", tabs, constant->charval);
+		break;
+	case CMPLX:
+		printf("%sCMPLX(%lf, %lf)\n", tabs, constant->cmplxval.re, constant->cmplxval.im);
+	default:
+		break;
+	}
+}
+
+void ast_print_initial_value(AST_Values *values, char *tabs)
+{
+	char *mtabs = more_tabs(tabs);
+	for (int i = 0; i < values->size; i++) {
+		ast_print_constant(values->elements[i], mtabs);
+	}
 	return;
 }
 
 void ast_print_decl(decl_t *decl, char *tabs)
 {
 	ast_print_datatype(decl->datatype, tabs);
-	ast_print_variable(decl->variable, tabs);
+	ast_print_variable(decl->variable, " ");
 	if (decl->initial_value != NULL)
 		ast_print_initial_value(decl->initial_value, tabs);
 	printf("\n");
@@ -598,16 +1265,103 @@ void ast_print_decl(decl_t *decl, char *tabs)
 
 void ast_print_decls(AST_Decls *decls, char *tabs)
 {
-	for (int i = 0; i < decls->size; i++) {
-		ast_print_decl(decls->declarations[i], tabs);
-	}
-	return;
+	if (decls)
+		for (int i = 0; i < decls->size; i++) {
+			ast_print_decl(decls->declarations[i], tabs);
+		}
 }
 
 void ast_print_statements(AST_Statements *statements, char *tabs)
 {
+	AST_Statement *ptr;
+	char *mtabs = more_tabs(tabs);
+	
+	for (ptr = statements->head; ptr != NULL; ptr = ptr->next) {
+		printf("%s<stmt-%d>\n", tabs, ptr->statement_id);
+		if (ptr->type == SIMPLE) {
+			ast_print_simple_statement(ptr->simple, mtabs);
+		}
+		else if (ptr->type == COMPOUND) {
+			ast_print_compound_statement(ptr->compound, mtabs);
+		}
+		printf("\n");
+	}
+}
+
+void ast_print_simple_statement(AST_SimpleStatement *statement, char  *tabs)
+{
+	char *simple_stmt_type_str[] = {"ASSIGNMENT", "GOTO", "IF", "CALL_SUBROUTINE", "IO", "CONTINUE", "RETURN", "STOP"};
+	char *mtabs = more_tabs(tabs);
+	
+	printf("%s%s statement\n", tabs, simple_stmt_type_str[statement->type]);
+
+	switch (statement->type)
+	{
+	case GOTO:
+		if (statement->goto_statement->variable == NULL) {
+			printf("%sGOTO -> stmt %d\n", tabs, statement->goto_statement->statement->statement_id);
+		}
+		// else {
+		// 	printf("%s GOTO depends on variable:\n", tabs);
+
+		// 	ast_print_variable_access(statement->variable, mtabs);
+		// 	printf("%s statement id list:", tabs);
+		// 	for (AST_Statement *ptr; ptr != NULL; )
+
+		// 	for 
+		// }
+		break;
+	case ASSIGNMENT:
+		printf("%sAssign to variable: \n", tabs);
+		ast_print_variable_access(statement->assignment->variable, mtabs);
+		
+		if (statement->assignment->type == AS_STRING) {
+			printf("%s The string \"%s\"", tabs, statement->assignment->string);
+		}
+		else if (statement->assignment->type == AS_EXPRESSION) {
+			ast_print_expression(statement->assignment->expression, mtabs);
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+void ast_print_expression(AST_Expression *expression, char *tabs)
+{
+	char *unary_op_str[] =  {"PLUS", "MINUS", "NOT", "LENGTH", "NEW"};
+	char *binary_op_str[] = {"PLUS","MINUS", "AND", "OR", "GT", "GE", "LT", "LE", "EQ", "NE", "MUL", "DIV", "POWER", "CMPLX"};
+	char *mtabs = more_tabs(tabs);
+
+
+	if (expression->expr_type == EXPR_UNARY) {
+		printf("%sop: %s\n", tabs, unary_op_str[expression->unary.op]);
+		printf("%schild: \n", tabs);
+		ast_print_expression(expression->unary.child, mtabs);
+	}
+	else if (expression->expr_type == EXPR_BINARY) {
+		printf("%sop: %s\n", tabs, binary_op_str[expression->binary.op]);
+		printf("%schild1: \n", tabs);
+		ast_print_expression(expression->binary.child1, mtabs);
+		printf("%schild2: \n", tabs);
+		ast_print_expression(expression->binary.child2, mtabs);
+	}
+	else if (expression->expr_type == EXPR_VARIABLE) {
+		printf("%sExpression reduces to variable: \n", tabs);
+		ast_print_variable_access(expression->variable, mtabs);
+	}
+	else if (expression->expr_type == EXPR_CONSTANT) {
+		ast_print_constant(expression->constant, tabs);
+	}
+}
+
+
+void ast_print_compound_statement(AST_CompoundStatement *statement, char  *tabs)
+{
 	return;
 }
+
+
 
 void ast_print_body(AST_Body *body, char *tabs)
 {
@@ -617,9 +1371,9 @@ void ast_print_body(AST_Body *body, char *tabs)
 	ast_print_decls(body->declarations, mtabs);
 	printf("%sStatements:\n", tabs);
 	ast_print_statements(body->statements, mtabs);
+	// printf("\"%s\"\n", mtabs);
 	
 	free(mtabs);
-	return;
 }
 
 // Function for printing a subprogram ast
@@ -629,8 +1383,9 @@ void ast_print_subprogram(AST_Subprogram *subgprogram)
 	ast_print_header(subgprogram->header);
 	ast_print_body(subgprogram->body, "");
 	printf("+++++++++++++++++++++++++++++++++++++\n");
-	return;
 }
+
+
 
 // Print an AST_Values structure
 void ast_print_values(AST_Values *values)

@@ -175,7 +175,14 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 ".AND."					{ return print_token(T_ANDOP); }
 ".OR."					{ return print_token(T_OROP); }
 ".NOT."					{ return print_token(T_NOTOP); }
-"."([GL][TE]|EQ|NE)"."	{ return print_token(T_RELOP); }
+
+".GT."					{ yylval.relopval = R_GT; return print_token(T_RELOP); }
+".GE."					{ yylval.relopval = R_GE; return print_token(T_RELOP); }
+".LT."					{ yylval.relopval = R_LT; return print_token(T_RELOP); }
+".LE."					{ yylval.relopval = R_LE; return print_token(T_RELOP); }
+".EQ."					{ yylval.relopval = R_EQ; return print_token(T_RELOP); }
+".NE."					{ yylval.relopval = R_NE; return print_token(T_RELOP); }
+
 
 "+"						{ yylval.signval = PLUS; return print_token(T_ADDOP); }
 "-"						{ yylval.signval = MINUS; return print_token(T_ADDOP); }

@@ -3,9 +3,12 @@
 #include "symbol_table.h"
 #include <assert.h>
 #include <stdio.h>
+#include <stdint.h>
+
 
 extern HASHTBL *symbol_table;
 extern int scope;
+extern char *type_str[];
 
 // Ensure that a constant has a sign only if it is int or real
 int SEM_signable_constant(AST_Sign sign, AST_Constant *constant)
@@ -58,153 +61,154 @@ int SEM_check_decl_datatype_simple(AST_GeneralType *datatype, type_t type, char 
 	return 0;
 }
 
-int recursive_SEM_check_REC_compatible_initialization(AST_Field **parent_field_elements, int parent_field_size, AST_Values *value_list, int *value_list_remainder)
-{
-	int i,j;
+// int recursive_SEM_check_REC_compatible_initialization(AST_Field **parent_field_elements, int parent_field_size, AST_Values *value_list, int *value_list_remainder)
+// {
+// 	int i,j;
 	
-	for (i = 0; i < parent_field_size && *value_list_remainder > 0; i++) {
-		AST_Field *field = parent_field_elements[i]; // Can contain multiple variables
+// 	for (i = 0; i < parent_field_size && *value_list_remainder > 0; i++) {
+// 		AST_Field *field = parent_field_elements[i]; // Can contain multiple variables
 
-		if (field->type != REC) {
-			char buffer[MAX_STRING_LENGTH];
+// 		if (field->type != REC) {
+// 			char buffer[MAX_STRING_LENGTH];
 
-			// Iterate over all variables of the same type
-			for (j = 0; j < field->vars->size; j++) {
-				AST_UndefVar *var = field->vars->elements[j];
+// 			// Iterate over all variables of the same type
+// 			for (j = 0; j < field->vars->size; j++) {
+// 				AST_UndefVar *var = field->vars->elements[j];
 				
-				// Field variable is scalar
-				if (var->type == SCALAR) {
-					if(*value_list_remainder <= 0) {
-						break;
-					}
+// 				// Field variable is scalar
+// 				if (var->type == SCALAR) {
+// 					if(*value_list_remainder <= 0) {
+// 						break;
+// 					}
 
-					// Since the are remaining elements in the value list ensure the types are compatible
-					if(field->type != value_list->elements[value_list->size - *value_list_remainder]->type) {
-						sprintf(buffer, "<SEM> Value list for initialization of scalar variable '%s' has a value of an incompatible type", var->id);
-						yyerror(buffer);
-						return 1;
-					}
+// 					// Since the are remaining elements in the value list ensure the types are compatible
+// 					if(field->type != value_list->elements[value_list->size - *value_list_remainder]->type) {
+// 						sprintf(buffer, "<SEM> Value list for initialization of scalar variable '%s' has a value of an incompatible type", var->id);
+// 						yyerror(buffer);
+// 						return 1;
+// 					}
 
-					(*value_list_remainder)--;
-				}
-				// Field variable is array
-				else if (var->type == ARRAY) {
-					int size, k;
+// 					(*value_list_remainder)--;
+// 				}
+// 				// Field variable is array
+// 				else if (var->type == ARRAY) {
+// 					int size, k;
 					
-					// Calculate total number of array elements
-					for (size = 1, k = 0; k < var->dims->size; k++) {
-						size *= var->dims->elements[k];
-					}
-					size = (size <= *value_list_remainder) ? size : *value_list_remainder;
+// 					// Calculate total number of array elements
+// 					for (size = 1, k = 0; k < var->dims->size; k++) {
+// 						size *= var->dims->elements[k];
+// 					}
+// 					size = (size <= *value_list_remainder) ? size : *value_list_remainder;
 
-					// Check for type compatibility over all matching initialization values
-					for (k = 0; k < value_list->size - size; k++) {
-						if (field->type != value_list->elements[k]->type) {
-							sprintf(buffer, "<SEM> Value list for initialization of array variable '%s' contains a value of incompatible type", var->id);
-							yyerror(buffer);
-							return 1;
-						}
-					}
-					*value_list_remainder -= size;
-				}
-				// Field variable is list
-				else {
-					// There shouldn't be remaining initialization values matching a list variable
-					if(*value_list_remainder > 0) {
-						sprintf(buffer, "<SEM> List variable '%s' cannot be initialized in the data section", var->id);
-						yyerror(buffer);
-						return 1;
-					}
-				}
-			}
-		}
-		// This field is also a record so call the same function recursively
-		else {
-			// Iterate over all variables of the same record datatype
-			for (j = 0; j < field->vars->size; j++) {
-				return recursive_SEM_check_REC_compatible_initialization(field->fields, field->size, value_list, value_list_remainder);
-			}
-		}
-	}
+// 					// Check for type compatibility over all matching initialization values
+// 					for (k = 0; k < value_list->size - size; k++) {
+// 						if (field->type != value_list->elements[k]->type) {
+// 							sprintf(buffer, "<SEM> Value list for initialization of array variable '%s' contains a value of incompatible type", var->id);
+// 							yyerror(buffer);
+// 							return 1;
+// 						}
+// 					}
+// 					*value_list_remainder -= size;
+// 				}
+// 				// Field variable is list
+// 				else {
+// 					// There shouldn't be remaining initialization values matching a list variable
+// 					if(*value_list_remainder > 0) {
+// 						sprintf(buffer, "<SEM> List variable '%s' cannot be initialized in the data section", var->id);
+// 						yyerror(buffer);
+// 						return 1;
+// 					}
+// 				}
+// 			}
+// 		}
+// 		// This field is also a record so call the same function recursively
+// 		else {
+// 			// Iterate over all variables of the same record datatype
+// 			for (j = 0; j < field->vars->size; j++) {
+// 				return recursive_SEM_check_REC_compatible_initialization(field->fields, field->size, value_list, value_list_remainder);
+// 			}
+// 		}
+// 	}
 
-	return 0;
-}
+// 	return 0;
+// }
 
 int SEM_check_compatible_initialization(decl_t *decl, AST_Values *value_list)
-{
-	// Also we can initialize array of characters with strings make that happen
+{ return 0; }
+// {
+// 	// Also we can initialize array of characters with strings make that happen
 
-	char buffer[MAX_STRING_LENGTH];
+// 	char buffer[MAX_STRING_LENGTH];
 
-	// Raise an exception when the variable is a list since it cannot be initialized in the data section
-	if (decl->variable->list_depth != 0) {
-		sprintf(buffer, "<SEM> List variable '%s' cannot be initialized in the data section", decl->variable->id);
-		yyerror(buffer);
-		return 1;
-	}
+// 	// Raise an exception when the variable is a list since it cannot be initialized in the data section
+// 	if (decl->variable->list_depth != 0) {
+// 		sprintf(buffer, "<SEM> List variable '%s' cannot be initialized in the data section", decl->variable->id);
+// 		yyerror(buffer);
+// 		return 1;
+// 	}
 
-	// Variable is a scalar
-	if (decl->variable->type == SCALAR) {
-		if (decl->datatype->type == REC) {
-			// Scalar variable has a complex datatype (record), so check its fields recursively
-			int value_list_remainder = value_list->size;
-			// TODO: Check if there are remaining elements after function call
-			return recursive_SEM_check_REC_compatible_initialization(decl->datatype->fields->elements, decl->datatype->fields->size, value_list, &value_list_remainder);
-		}
-		else if (value_list->size != 1) {
-			// Scalar variable has a simple datatype hence the value list must have one element
-			sprintf(buffer, "<SEM> Value list for initialization of scalar variable '%s' hasn't exactly one value of the same type", decl->variable->id);
-			yyerror(buffer);
-			return 1;
-		}
-		else if (decl->datatype->type != value_list->elements[0]->type) { 
-			// Scalar variable has a simple datatype but the value list contains one element of incompatible type
-			sprintf(buffer, "<SEM> Value list for initialization of scalar variable '%s' has a value of an incompatible type", decl->variable->id);
-			yyerror(buffer);
-			return 1;
-		}
-	}
+// 	// Variable is a scalar
+// 	if (decl->variable->type == SCALAR) {
+// 		if (decl->datatype->type == REC) {
+// 			// Scalar variable has a complex datatype (record), so check its fields recursively
+// 			int value_list_remainder = value_list->size;
+// 			// TODO: Check if there are remaining elements after function call
+// 			return recursive_SEM_check_REC_compatible_initialization(decl->datatype->fields->elements, decl->datatype->fields->size, value_list, &value_list_remainder);
+// 		}
+// 		else if (value_list->size != 1) {
+// 			// Scalar variable has a simple datatype hence the value list must have one element
+// 			sprintf(buffer, "<SEM> Value list for initialization of scalar variable '%s' hasn't exactly one value of the same type", decl->variable->id);
+// 			yyerror(buffer);
+// 			return 1;
+// 		}
+// 		else if (decl->datatype->type != value_list->elements[0]->type) { 
+// 			// Scalar variable has a simple datatype but the value list contains one element of incompatible type
+// 			sprintf(buffer, "<SEM> Value list for initialization of scalar variable '%s' has a value of an incompatible type", decl->variable->id);
+// 			yyerror(buffer);
+// 			return 1;
+// 		}
+// 	}
 
-	// Variable is a array
-	if (decl->variable->type == ARRAY) {
-		int size, i;
+// 	// Variable is a array
+// 	if (decl->variable->type == ARRAY) {
+// 		int size, i;
 		
-		// Calculate the total number of array elements
-		for (size = 1, i = 0; i < decl->variable->dims->size; i++) {
-			size *= decl->variable->dims->elements[i];
-		}
+// 		// Calculate the total number of array elements
+// 		for (size = 1, i = 0; i < decl->variable->dims->size; i++) {
+// 			size *= decl->variable->dims->elements[i];
+// 		}
 
-		// Array variable has a complex datatype (record), so check its fields recursively
-		if (decl->datatype->type == REC) {
-			int value_list_remainder = value_list->size;
-			// Check as many times as the elements of the array
-			for (i = 0; i < size; i++) {
-				// TODO: Check if there are remaining elements after function call
-				return recursive_SEM_check_REC_compatible_initialization(decl->datatype->fields->elements, decl->datatype->fields->size, value_list, &value_list_remainder);
-			}
-		}
-		// Array variable has a simple datatype
-		else {
-			// There shouldn't be any remaining initialization values 
-			if (value_list->size > size) {
-				sprintf(buffer, "<SEM> Value list for initialization of array variable '%s' has remaining unmatched values", decl->variable->id);
-				yyerror(buffer);
-				return 1;
-			}
+// 		// Array variable has a complex datatype (record), so check its fields recursively
+// 		if (decl->datatype->type == REC) {
+// 			int value_list_remainder = value_list->size;
+// 			// Check as many times as the elements of the array
+// 			for (i = 0; i < size; i++) {
+// 				// TODO: Check if there are remaining elements after function call
+// 				return recursive_SEM_check_REC_compatible_initialization(decl->datatype->fields->elements, decl->datatype->fields->size, value_list, &value_list_remainder);
+// 			}
+// 		}
+// 		// Array variable has a simple datatype
+// 		else {
+// 			// There shouldn't be any remaining initialization values 
+// 			if (value_list->size > size) {
+// 				sprintf(buffer, "<SEM> Value list for initialization of array variable '%s' has remaining unmatched values", decl->variable->id);
+// 				yyerror(buffer);
+// 				return 1;
+// 			}
 
-			// All values in the value list matching the array elements should be of the same type
-			for (i = 0; i < value_list->size; i++) {
-				if (decl->datatype->type != value_list->elements[i]->type) {
-					sprintf(buffer, "<SEM> Value list for initialization of array variable '%s' contains a value of incompatible type", decl->variable->id);
-					yyerror(buffer);
-					return 1;
-				}
-			}
-		}
-	}
+// 			// All values in the value list matching the array elements should be of the same type
+// 			for (i = 0; i < value_list->size; i++) {
+// 				if (decl->datatype->type != value_list->elements[i]->type) {
+// 					sprintf(buffer, "<SEM> Value list for initialization of array variable '%s' contains a value of incompatible type", decl->variable->id);
+// 					yyerror(buffer);
+// 					return 1;
+// 				}
+// 			}
+// 		}
+// 	}
 
-	return 0;
-}
+// 	return 0;
+// }
 
 // Ensure that the depth of a list is less than the acceptable
 int SEM_check_list_depth(AST_UndefVar *list_node)
@@ -212,7 +216,7 @@ int SEM_check_list_depth(AST_UndefVar *list_node)
 	char buffer[MAX_STRING_LENGTH];
 
 	if (list_node->list_depth > MAX_LIST_DEPTH) {
-		sprintf(buffer, "List %s has depth more than the acceptable %d", list_node->id, MAX_LIST_DEPTH);
+		sprintf(buffer, "<SEM> List %s has depth more than the acceptable %d", list_node->id, MAX_LIST_DEPTH);
 		yyerror(buffer);
 		return 1;
 	}
@@ -228,7 +232,7 @@ int SEM_check_duplicate_variable_name(const char *new_id)
 	char buffer[MAX_STRING_LENGTH];
 
 	if (var != NULL) {
-		sprintf(buffer, "Variable %s has already been declared", new_id);
+		sprintf(buffer, "<SEM> Variable %s has already been declared", new_id);
 		yyerror(buffer);
 		return 1;
 	}
@@ -241,7 +245,7 @@ int SEM_check_duplicate_variable_name(const char *new_id)
 int SEM_check_initialization_position()
 {
 	if (stbl_get_curr_scope() != 1) {
-		yyerror("Initialization allowed only at the outermost scope of a unit.");
+		yyerror("<SEM> Initialization allowed only at the outermost scope of a unit.");
 		return 1;
 	}
 	else {
@@ -252,11 +256,11 @@ int SEM_check_initialization_position()
 // Make sure that there is no other subprogram with the same name
 int SEM_check_duplicate_subprogram_name(char *id)
 {
-	STBL_Entry *subprogram = stbl_search_current_scope(id);
+	STBL_Entry *subprogram = stbl_search_subprogram(id);
 	char buffer[MAX_STRING_LENGTH];
 
 	if (subprogram != NULL) {
-		sprintf(buffer, "Subprogram %s has already been declared", id);
+		sprintf(buffer, "<SEM> Subprogram %s has already been declared", id);
 		yyerror(buffer);
 	}
 	return 0;
@@ -268,8 +272,111 @@ int SEM_check_existing_arguments(AST_Params *params, char *id)
 	char buffer[MAX_STRING_LENGTH];
 	
 	if (params == NULL || params->size < 1) {
-		sprintf(buffer, "Function %s requires at least one parameters.", id);
+		sprintf(buffer, "<SEM> Function %s requires at least one parameters.", id);
 		yyerror(buffer);
 	}
 	return 0;
+}
+
+int check_dim_variable(AST_Dim *dim, bool is_param)
+{
+	char *id = dim->id;
+	decl_t *decl = stbl_search_variable(id);
+	int error = 0;
+
+	error = SEM_check_existing_variable(decl, id);
+	if (!error)
+		error = SEM_check_decl_datatype_simple(decl->datatype, INT, id);
+	if (!error) {
+		// Local array cannot have a parameter as a dimension
+		if (decl->is_parameter && !is_param) {
+			error = 1;
+			char buffer[MAX_STRING_LENGTH];
+			sprintf(buffer, "<SEM> Local array cannot have parameter '%s' as a dimension", id);
+			yyerror(buffer);
+		}
+		else if (!(decl->is_parameter)) {
+			// When both variables are not parameters, the dimension variable should be initialized
+			error = SEM_check_initial_value_exists(decl);
+			if (!error) {
+				dim->type = DIM_LITERAL;
+				dim->val = decl->initial_value->elements[0]->intval;
+			}
+		}
+	}
+	
+	dim->decl = decl;
+
+	return error;
+}
+
+// Ensure that variable dimensions of an array exist in the symbol table
+int SEM_check_declared_dims(AST_Dims *dims, bool is_param)
+{
+	for (int i = 0; i < dims->size; i++) {
+		if (dims->elements[i]->type == DIM_VARIABLE) {
+			if (check_dim_variable(dims->elements[i], is_param)) {
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+
+int SEM_check_existing_record_field(AST_Field *field, char *rec_id, char *field_id)
+{
+	char buffer[MAX_STRING_LENGTH];
+	
+	if (field == NULL) {
+		sprintf(buffer, "<SEM> Record %s does not contain field %s", rec_id, field_id);
+		yyerror(buffer);
+	}
+	return 0;
+}
+
+int SEM_check_expr_datatype(AST_Expression *expr, uint8_t options)
+{
+	char buffer[MAX_STRING_LENGTH];
+
+	// Find the option value of the datatype of the expression
+	// and check if it exists in the options
+	if (options & (1 << expr->datatype->type)) {
+		return 0;
+	}
+	else {
+		sprintf(buffer, "<SEM> Expression has type %s which is incompatible with expression.", type_str[expr->datatype->type]);
+		yyerror(buffer);
+		return 1;
+	}
+}
+
+// Check if a variable is of a specific simple type
+int SEM_typecheck_variable(AST_Variable *variable, type_t type, char *string)
+{
+	char buffer[MAX_STRING_LENGTH];
+
+	if (variable->datatype->type != type) {
+		sprintf(buffer, "<SEM> %s is not of type %s", string, type_str[type]);
+		yyerror(buffer);
+		return 1;
+	}
+
+	return 0;
+}
+
+// Check if a variable is list
+int SEM_check_list(AST_Expression *expr)
+{
+	char buffer[MAX_STRING_LENGTH];
+
+	// Find the option value of the datatype of the expression
+	// and check if it exists in the options
+	if (expr->list_depth != 0) {
+		return 0;
+	}
+	else {
+		sprintf(buffer, "<SEM> Expression is not list");
+		yyerror(buffer);
+		return 1;
+	}
 }

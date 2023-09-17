@@ -25,11 +25,13 @@
 	char			charval;
 	char			*strval;
 
+	AST_Relop		relopval;
 	AST_Sign		signval;
 	AST_Type		typeval;
 	AST_Constant	*constval;
 	AST_Values		*values;
 	AST_Vals		*vals;
+	AST_Dim			*dim;
 	AST_Dims		*dims;
 	AST_UndefVar	*undef_var;
 	AST_Vars		*vars;
@@ -44,6 +46,15 @@
 	AST_Subprogram	*subprogram;
 	AST_Subprograms *subprograms;
 	AST_Program		*program;
+
+	AST_Statement		*statement;
+	AST_SimpleStatement *simple_statement;
+	AST_Goto			*goto_statement;
+	
+	AST_Expression		*expression;
+	AST_Variable 		*variable;
+	AST_Expressions		*expressions;
+	AST_Assignment		*assignment;
 }
 
 //  optional required  optional  optional
@@ -92,7 +103,7 @@
 %token	T_OROP		"orop"
 %token	T_ANDOP		"andop"
 %token	T_NOTOP		"notop"
-%token	T_RELOP 	".GT. or .GE. or .LT. or .LE. or .EQ. or NE."
+%token	<relopval>	T_RELOP 	".GT. or .GE. or .LT. or .LE. or .EQ. or .NE."
 %token	<signval>	T_ADDOP		"+ or -"
 %token	T_MULOP		"mulop"
 %token	T_DIVOP		"divop"
@@ -112,15 +123,15 @@
 %token	T_RBRACK	"rbrack"
 
 %token	T_EOF	0	"EOF"
- 
+
 // Declaring types for non-terminal variables
-%type <strval> labeled_statement label statement simple_statement assignment variable expressions listexpression goto_statement labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement
+%type <strval> listexpression labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement
 %type <typeval> type
 %type <constval> constant simple_constant complex_constant value
 %type <signval> sign
 %type <values> values value_list
 %type <vals> vals
-%type <intval> dim
+%type <dim> dim
 %type <dims> dims
 %type <undef_var> undef_variable
 %type <vars> vars
@@ -135,7 +146,16 @@
 %type <subprogram> subprogram;
 %type <subprograms> subprograms;
 %type <program> program
-/* %type <exprval> expression */
+
+%type <statement> statement
+%type <statement> labeled_statement
+%type <simple_statement> simple_statement
+%type <intval> label
+%type <goto_statement> goto_statement
+%type <expression> expression
+%type <expressions> expressions
+%type <variable> variable
+%type <assignment> assignment
 
 
 /* Declaring ascociativities and priorities */
@@ -153,7 +173,7 @@ with specified associativity (left/right/nonassoc) */
 %%
 
 // High-level structure of a FORT200 program
-program:			{ stbl_increase_scope(); } body T_END { stbl_clear_scope(); ast_print_body($2, ""); stbl_decrease_scope(); } subprograms { $$ = ast_get_program($2, $5); }
+program:			{ stbl_increase_scope(); } body T_END { match_labels_to_label_uses(); stbl_clear_scope(); ast_print_body($2, ""); stbl_decrease_scope(); } subprograms { $$ = ast_get_program($2, $5); }
 					/* | body error T_EOF { yyerror("Expected keyword 'end' at the end of the program"); yyerrok; } */
 
 // Body consisting of variable declarations and statements
@@ -187,8 +207,8 @@ dims:				dims T_COMMA dim { $$ = ast_insert_dim_to_dims($1, $3); }
 					| dim { $$ = ast_insert_dim_to_dims(NULL, $1); }
 
 // Propagate the value to dim. Either directly (ICONST) or from the the symbol table (ID)
-dim:				T_ICONST { $$ = $1; }
-					| T_ID { $$ = stbl_get_int_initVal($1); }
+dim:				T_ICONST { $$ = ast_get_dim_literal($1); }
+					| T_ID { $$ = ast_get_dim_variable($1); }
 
 // Form an array of fields
 fields:				fields field { $$ = ast_insert_field_to_fields($1, $2); }
@@ -230,60 +250,63 @@ simple_constant:	T_ICONST { $$ = ast_get_ICONST($1); }
 // Give the complex type as well as the real and imaginary values of the complex number
 complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN { $$ = ast_get_CMPLX($2, $4, $5); }
 
-statements:			statements labeled_statement { $$ = NULL; }
-					| labeled_statement { $$ = NULL; }
+// Create a linked list of statements
+statements:			statements labeled_statement { $$ = ast_insert_statement_to_statements($1, $2); }
+					| labeled_statement { $$ = ast_insert_statement_to_statements(NULL, $1); }
 
-labeled_statement:	label statement
-					| statement
+labeled_statement:	label statement { $$ = $2; stbl_insert_label($1, $2); }
+					| statement { $$ = $1; }
 
-label:				T_ICONST
+label:				T_ICONST { $$ = $1; }
 
-statement:			simple_statement
-					| compound_statement
 
-simple_statement:	assignment
-					| goto_statement
-					| if_statement
-					| subroutine_call
-					| io_statement
-					| T_CONTINUE
-					| T_RETURN
-					| T_STOP
+statement:			simple_statement { $$ = ast_get_statement(SIMPLE, $1); }
+					| compound_statement  { $$ = NULL; }
 
-assignment:			variable T_ASSIGN expression
-					| variable T_ASSIGN T_STRING
+simple_statement:	assignment { $$ = ast_get_simple_statement(ASSIGNMENT, $1); }
+					| goto_statement { $$ = ast_get_simple_statement(GOTO, $1); }
+					| if_statement  { $$ = NULL; }
+					| subroutine_call  { $$ = NULL; }
+					| io_statement  { $$ = NULL; }
+					| T_CONTINUE  { $$ = NULL; }
+					| T_RETURN  { $$ = NULL; }
+					| T_STOP  { $$ = NULL; }
 
-variable:			variable T_DOT T_ID
-					| variable T_LPAREN expressions T_RPAREN
-					| T_LISTFUNC T_LPAREN expression T_RPAREN
-					| T_ID
+// Assignment from expression or string to variable
+assignment:			variable T_ASSIGN expression { $$ = ast_get_assignment_expression($1, $3); }
+					| variable T_ASSIGN T_STRING { $$ = ast_get_assignment_string($1, $3); }
+
+variable:			variable T_DOT T_ID { $$ = ast_get_variable_rec_access($1, $3);}
+					| variable T_LPAREN expressions T_RPAREN { $$ = NULL;}
+					| T_LISTFUNC T_LPAREN expression T_RPAREN { $$ = NULL;}
+					| T_ID { $$ = ast_get_variable_id($1); }
 
 expressions:		expressions T_COMMA expression
 					| expression
 
-expression:			expression T_OROP expression
-					| expression T_ANDOP expression
-					| expression T_RELOP expression
-					| expression T_ADDOP expression
-					| expression T_MULOP expression
-					| expression T_DIVOP expression
-					| expression T_POWEROP expression
-					| T_NOTOP expression
-					| T_ADDOP expression
-					| variable
-					| simple_constant
-					| T_LENGTH T_LPAREN expression T_RPAREN
-					| T_NEW T_LPAREN expression T_RPAREN
-					| T_LPAREN expression T_RPAREN
-					| T_LPAREN expression T_COLON expression T_RPAREN
+expression:			expression T_OROP expression			{ $$ = ast_get_expression_binary_orop($1, $3); }
+					| expression T_ANDOP expression			{ $$ = ast_get_expression_binary_andop($1, $3); }
+					| expression T_RELOP expression			{ $$ = ast_get_expression_binary_relop($2, $1, $3); }
+					| expression T_ADDOP expression			{ $$ = ast_get_expression_binary_addop($2, $1, $3); }
+					| expression T_MULOP expression			{ $$ = ast_get_expression_binary_mulop($1, $3); }
+					| expression T_DIVOP expression			{ $$ = ast_get_expression_binary_divop($1, $3); }
+					| expression T_POWEROP expression		{ $$ = ast_get_expression_binary_pwrop($1, $3); }
+					| T_NOTOP expression					{ $$ = ast_get_expression_unary_notop($2); }
+					| T_ADDOP expression					{ $$ = ast_get_expression_unary_addop($2, $1); }
+					| variable								{ $$ = ast_get_expression_var($1); }
+					| simple_constant						{ $$ = ast_get_constant_expr($1); }
+					| T_LENGTH T_LPAREN expression T_RPAREN	{ $$ = ast_get_expression_unary_length($3); }
+					| T_NEW T_LPAREN expression T_RPAREN	{ $$ = ast_get_expression_unary_new($3); }
+					| T_LPAREN expression T_RPAREN			{ $$ = $2; }
+					| T_LPAREN expression T_COLON expression T_RPAREN { $$ = ast_get_expression_binary_cmplx($2, $4); }
 					| listexpression
 					| expression error expression { yyerror("Expected operator or seperator ',' between expressions"); yyerrok; }
 
 listexpression:		T_LBRACK expressions T_RBRACK
 					| T_LBRACK T_RBRACK
 
-goto_statement:		T_GOTO label
-					| T_GOTO T_ID T_COMMA T_LPAREN labels T_RPAREN
+goto_statement:		T_GOTO label { $$ = ast_get_independent_goto($2); }
+					| T_GOTO T_ID T_COMMA T_LPAREN labels T_RPAREN  { $$ = NULL; } //{ $$ = ast_get_computed_goto($2, $5); }
 
 labels:				labels T_COMMA label
 					| labels error label { yyerror("Missing seperator between labels"); yyerrok; }
@@ -320,21 +343,21 @@ compound_statement:	branch_statement
 
 branch_statement:	T_IF T_LPAREN expression T_RPAREN T_THEN { stbl_increase_scope(); } body tail
 
-tail:				T_ELSE { stbl_clear_scope(); }  body T_ENDIF { stbl_clear_scope(); stbl_decrease_scope(); }
-					| T_ENDIF { stbl_clear_scope(); stbl_decrease_scope(); }
+tail:				T_ELSE { match_labels_to_label_uses(); stbl_clear_scope(); }  body T_ENDIF { match_labels_to_label_uses(); stbl_clear_scope(); stbl_decrease_scope(); }
+					| T_ENDIF { match_labels_to_label_uses(); stbl_clear_scope(); stbl_decrease_scope(); }
 
-loop_statement:		T_DO T_ID T_ASSIGN iter_space { stbl_increase_scope(); } body T_ENDDO { stbl_clear_scope(); stbl_decrease_scope(); }
+loop_statement:		T_DO T_ID T_ASSIGN iter_space { stbl_increase_scope(); } body T_ENDDO { match_labels_to_label_uses(); stbl_clear_scope(); stbl_decrease_scope(); }
 
 subprograms:		subprograms subprogram { $$ = ast_insert_subprogram_to_subprograms($1, $2); }
 					| %empty { $$ = NULL; }
 
 // The subprograms have global scope, so we do not have to increase the scope variable
-subprogram:			header { stbl_increase_scope(); } body { stbl_clear_scope(); stbl_decrease_scope(); } T_END { $$ = ast_get_subprogram($1, $3); ast_print_subprogram($$); }
+subprogram:			 { stbl_increase_scope(); } header body { match_labels_to_label_uses(); stbl_clear_scope(); stbl_decrease_scope(); } T_END { $$ = ast_get_subprogram($2, $3); ast_print_subprogram($$); }
 
 // Header of a subprogram
-header:				type T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN { $$ = ast_get_header(FUNCTION, $1, false, $3, $5); }
-					| T_LIST T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN { $$ = ast_get_header(FUNCTION, 0, true, $3, $5); }
-					| T_SUBROUTINE T_ID T_LPAREN formal_parameters T_RPAREN { $$ = ast_get_header(SUBROUTINE, 0, false, $2, $4); }
+header:				type T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN { ast_check_params($5); $$ = ast_get_header(FUNCTION, $1, false, $3, $5); }
+					| T_LIST T_FUNCTION T_ID T_LPAREN formal_parameters T_RPAREN { ast_check_params($5); $$ = ast_get_header(FUNCTION, 0, true, $3, $5); }
+					| T_SUBROUTINE T_ID T_LPAREN formal_parameters T_RPAREN { ast_check_params($4); $$ = ast_get_header(SUBROUTINE, 0, false, $2, $4); }
 					| T_SUBROUTINE T_ID { $$ = ast_get_header(SUBROUTINE, 0, false, $2, NULL); }
 
 // Parameters of a subprogram

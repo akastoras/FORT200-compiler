@@ -5,9 +5,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+
 /****************************************************/
 /********************** STRUCTS *********************/
 /****************************************************/
+
+/** Declaration structs **/
 
 // Value representing the type of an expression
 typedef enum {
@@ -16,6 +19,9 @@ typedef enum {
 
 // Values representing the op used as sign or addop
 typedef enum {MINUS=-1, NONE=0, PLUS=1} AST_Sign;
+ 
+// Values representing different relops
+typedef enum {R_GT=0, R_GE, R_LT, R_LE, R_EQ, R_NE} AST_Relop;
 
 // Representation of complex as two reals
 typedef struct {
@@ -61,10 +67,26 @@ typedef struct {
 	init_val_t **elements;
 } AST_Vals;
 
+typedef struct decl decl_t;
+
+typedef enum {DIM_LITERAL=0, DIM_VARIABLE} dim_type_t;
+
+// Struct for dim that can either be literal or variable
+typedef struct {
+	dim_type_t type;
+	union {
+		// if type is DIM_VARIABLE
+		decl_t *decl; // Stores the stbl entry for the id after it is declared
+		char *id; // Used for temporarily storing a possibly undeclared id
+		// if type is DIM_LITERAL
+		int val;
+	};
+} AST_Dim;
+
 // Struct containing info for a dim array
 typedef struct {
 	int size;
-	int *elements;
+	AST_Dim **elements;
 } AST_Dims;
 
 // Value representing the type of an undefined variable
@@ -86,21 +108,23 @@ typedef struct {
 	AST_UndefVar **elements;
 } AST_Vars;
 
+typedef struct fields AST_Fields;
+
 // Struct containing information about a field.
 // When a field is a record, it holds an array of its subfields
 typedef struct field {
 	AST_Vars *vars; // Variables with that type
 	/* The type */
 	type_t type;
-	int size;
-	struct field **fields;
+	/* if type == REC store its fields*/
+	AST_Fields *fields;
 } AST_Field;
 
 // Struct containing an array of fields
-typedef struct {
+struct fields {
 	int size;
 	AST_Field **elements;
-} AST_Fields;
+};
 
 // General type that covers all data types
 typedef struct {
@@ -109,12 +133,12 @@ typedef struct {
 } AST_GeneralType;
 
 // Struct for the declaration of a single id
-typedef struct {
+struct decl {
 	AST_UndefVar *variable; // Many variables (SCALAR, ARRAY or LIST)
 	AST_GeneralType *datatype; // The common datatype of all vars
 	AST_Values *initial_value; // Same index as vars
-	bool is_parameter;
-} decl_t;
+	bool is_parameter; // Used to identify function parameters
+};
 
 // Struct for declarations tree
 typedef struct {
@@ -123,8 +147,182 @@ typedef struct {
 } AST_Decls;
 
 
-typedef void * AST_Statements;
+/** Statement structs **/
+typedef enum {EXPR_UNARY, EXPR_BINARY, EXPR_VARIABLE, EXPR_CONSTANT, EPXR_LISTEXPR} expr_type_t;
+typedef enum {U_PLUS, U_MINUS, U_NOT, U_LENGTH, U_NEW} unary_op_t ;
+typedef enum {
+	// DO NOT THINK OF CHANGING THE ORDER
+	B_PLUS=0, B_MINUS, B_AND, B_OR,
+	B_GT, B_GE, B_LT, B_LE, B_EQ,
+	B_NE, B_MUL, B_DIV, B_POWER, B_CMPLX
+} binary_op_t;
 
+// Forward declaration of structs
+typedef struct variable AST_Variable;
+typedef struct expressions AST_Expressions;
+typedef struct subprogram AST_Subprogram;
+
+// Expression struct
+typedef struct expression {
+	expr_type_t expr_type;
+	AST_GeneralType *datatype;
+	int list_depth; // 0 if not list
+
+	union {
+		// Unary: Expressions with one expression child
+		struct {
+			unary_op_t op;
+			struct expression *child;
+		} unary;
+
+		// Binary: Expressions with two expression childs
+		struct {
+			binary_op_t op;
+			struct expression *child1;
+			struct expression *child2;
+		} binary;
+		
+		// Expressions is variable
+		AST_Variable *variable;
+
+		// Expressions is constant
+		AST_Constant *constant;
+		
+		// Initialization of list as a list of expressions
+		AST_Expressions *listexpr;
+	};
+} AST_Expression;
+
+// Array of expressions
+struct expressions {
+	int size;
+	AST_Expressions **elements;
+};
+
+typedef enum {V_ID, V_DECL, V_FUNC_CALL, V_ARRAY_ACCESS, V_REC_ACCESS, V_LISTFUNC} variable_type_t;
+
+// Variable Struct
+struct variable {
+	variable_type_t type;
+	AST_GeneralType *datatype;
+
+	union {
+		// V_ID
+		char *id; // Used initially and transformed to another type when reused
+
+		// V_DECL
+		decl_t *decl;
+
+		// V_FUNC_CALL
+		struct {
+			AST_Subprogram *subprog;
+			AST_Expressions *args;
+		};
+
+		// V_ARRAY_ACCESS
+		struct {
+			AST_UndefVar *array;
+			AST_Expressions *indices;
+		};
+
+		// V_REC_ACCESS
+		struct {
+			AST_Variable *record;
+			AST_UndefVar *field_var; // Pointer to record in record.datatype.fields.elements[]
+		};
+
+		// V_LISTFUNC
+		struct {
+			void *listfunc;
+			AST_Expression *list;
+		};
+	};
+};
+
+
+// Assignment types
+typedef enum {AS_EXPRESSION, AS_STRING} assignment_type_t;
+
+// Struct for assignment node
+typedef struct {
+	AST_Variable *variable;
+	assignment_type_t type;
+	union {
+		// If type==AS_EXPRESSION
+		AST_Expression *expression;
+		// If type==AS_STRING
+		char *string;
+	};
+} AST_Assignment;
+
+
+// Forward declaration of structs
+typedef struct statements AST_Statements;
+typedef struct statement AST_Statement;
+
+// Struct for goto, connecting a goto with a statement
+// or a statement list (if variable != NULL)
+typedef struct {
+	decl_t *variable;
+	union {
+		AST_Statement *statement;
+		AST_Statements *statement_list;
+	};
+} AST_Goto;
+
+typedef enum {ASSIGNMENT=0, GOTO, IF, CALL_SUBROUTINE, IO, CONTINUE, RETURN, STOP}
+simple_statement_type_t;
+
+// Struct for simple statement node
+typedef struct {
+	simple_statement_type_t type;
+	union {
+		// If type==ASSIGNMENT
+		AST_Assignment *assignment;
+		// If type==GOTO
+		AST_Goto *goto_statement;
+	};
+}  AST_SimpleStatement;
+
+typedef void * AST_CompoundStatement;
+
+typedef enum {SIMPLE, COMPOUND} statement_type_t;
+
+// Wrapper for statements that combines
+// simple and compound statements in a struct
+struct statement {
+	statement_type_t type;
+	int statement_id; // Just for prints
+
+	union {
+		AST_SimpleStatement *simple;
+		AST_CompoundStatement *compound;
+	};
+	struct statement *next;
+};
+
+// Serial list of statements
+struct statements {
+	AST_Statement *head;
+	AST_Statement *tail;
+};
+
+// Struct containing the information from a label usage by a goto/if-statament
+typedef struct {
+	int min_scope; // The used label can be found in the interval [min_scope, 0] of scopes
+	int label; // The actual integer label
+	AST_Statement **statement_addr; // The address of the statement reference inside the goto/if-statement AST node
+} label_use_t;
+
+// An array of label uses for keeping all goto/if-statament references to currently undefined labels
+typedef struct {
+	int size;
+	label_use_t **elements;
+} label_uses_t;
+
+
+
+/** Program structs **/
 
 typedef enum {SUBROUTINE=0, FUNCTION} subprogram_type_t;
 
@@ -150,10 +348,10 @@ typedef struct {
 } AST_Body;
 
 // Subprogram with the header and body of a subprogram
-typedef struct {
+struct subprogram {
 	AST_Header *header;
 	AST_Body *body;
-} AST_Subprogram;
+};
 
 // Array of subprograms packed with its size
 typedef struct {
@@ -167,6 +365,8 @@ typedef struct {
 	AST_Body *main;
 	AST_Subprograms *subprograms;
 } AST_Program;
+
+
 
 /****************************************************/
 /********************* FUNCTIONS ********************/
@@ -185,7 +385,9 @@ AST_Constant *ast_get_value(AST_Sign, AST_Constant *);
 AST_Constant *ast_get_string(char *);
 AST_Values *ast_insert_value_to_values(AST_Values *, AST_Constant *);
 AST_Vals *ast_insert_val_to_vals(AST_Vals *, char *, AST_Values *);
-AST_Dims *ast_insert_dim_to_dims(AST_Dims *, int);
+AST_Dim *ast_get_dim_literal(int);
+AST_Dim *ast_get_dim_variable(char *);
+AST_Dims *ast_insert_dim_to_dims(AST_Dims *, AST_Dim *);
 AST_UndefVar *ast_get_undef_var(AST_UndefVar_Type, char *, AST_Dims *, AST_UndefVar *);
 AST_Vars *ast_insert_var_to_vars(AST_Vars *, AST_UndefVar *);
 AST_Fields *ast_insert_field_to_fields(AST_Fields *, AST_Field *);
@@ -193,14 +395,51 @@ AST_Field *ast_get_field(type_t, AST_Vars *, AST_Fields *);
 AST_Decls *ast_insert_decl_to_decls(AST_Decls *, type_t, AST_Fields *, AST_Vars *);
 void ast_insert_init_in_decls(AST_Vals *);
 
+// Statements Functions
+void match_labels_to_label_uses();
+AST_Goto *ast_get_independent_goto(int);
+AST_Statements *ast_insert_statement_to_statements(AST_Statements *, AST_Statement *);
+AST_Statement *ast_get_statement(statement_type_t, void *);
+AST_SimpleStatement *ast_get_simple_statement(simple_statement_type_t, void *);
+void ast_check_params(AST_Params *params);
+
+// Assign
+AST_Assignment *ast_get_assignment_expression(AST_Variable *variable, AST_Expression *expression);
+AST_Assignment *ast_get_assignment_string(AST_Variable *variable, char *string);
+
+// Expression functions
+AST_Expression *ast_get_expression_var(AST_Variable *variable);
+AST_Expression *ast_get_constant_expr(AST_Constant *constant);
+
+AST_Expression *ast_get_expression_unary(AST_Expression *child, unary_op_t op_type);
+AST_Expression *ast_get_expression_unary_notop(AST_Expression *child);
+AST_Expression *ast_get_expression_unary_addop(AST_Expression *child, AST_Sign sign);
+AST_Expression *ast_get_expression_unary_length(AST_Expression *child);
+AST_Expression *ast_get_expression_unary_new(AST_Expression *child);
+
+AST_Expression *ast_get_expression_binary(binary_op_t operation, AST_Expression *child1, AST_Expression *child2);
+AST_Expression *ast_get_expression_binary_orop(AST_Expression *child1, AST_Expression *child2);
+AST_Expression *ast_get_expression_binary_andop(AST_Expression *child1, AST_Expression *child2);
+AST_Expression *ast_get_expression_binary_relop(AST_Relop op, AST_Expression *child1, AST_Expression *child2);
+AST_Expression *ast_get_expression_binary_addop(AST_Sign sign, AST_Expression *child1, AST_Expression *child2);
+AST_Expression *ast_get_expression_binary_mulop(AST_Expression *child1, AST_Expression *child2);
+AST_Expression *ast_get_expression_binary_divop(AST_Expression *child1, AST_Expression *child2);
+AST_Expression *ast_get_expression_binary_pwrop(AST_Expression *child1, AST_Expression *child2);
+AST_Expression *ast_get_expression_binary_cmplx(AST_Expression *child1, AST_Expression *child2);
+
+// Variable
+AST_Variable *ast_get_variable_id(char *);
+AST_Variable *ast_get_variable_rec_access(AST_Variable *rec, char *field_id);
+
 
 // Program Functions
-AST_Params *ast_insert_param_to_params(AST_Params *old_params, type_t type, AST_Vars *vars);
-AST_Header *ast_get_header(subprogram_type_t subprogram_type, type_t type, bool is_list, char *id, AST_Params *params);
-AST_Subprogram *ast_get_subprogram(AST_Header *header, AST_Body *body);
-AST_Subprograms *ast_insert_subprogram_to_subprograms(AST_Subprograms *subprograms, AST_Subprogram *subprogram);
-AST_Body *ast_get_body(AST_Decls *decls, AST_Statements *statements);
-AST_Program *ast_get_program(AST_Body *main, AST_Subprograms *subprograms);
+AST_Params *ast_insert_param_to_params(AST_Params *, type_t, AST_Vars *);
+AST_Header *ast_get_header(subprogram_type_t , type_t, bool, char *, AST_Params *);
+AST_Subprogram *ast_get_subprogram(AST_Header *, AST_Body *);
+AST_Subprograms *ast_insert_subprogram_to_subprograms(AST_Subprograms *, AST_Subprogram *);
+AST_Body *ast_get_body(AST_Decls *, AST_Statements *);
+AST_Program *ast_get_program(AST_Body *, AST_Subprograms *);
+
 
 
 
@@ -208,6 +447,10 @@ AST_Program *ast_get_program(AST_Body *main, AST_Subprograms *subprograms);
 void ast_print_values(AST_Values *);
 void ast_print_body(AST_Body *, char *);
 void ast_print_subprogram(AST_Subprogram *);
-
+void ast_print_variable(AST_UndefVar *variable, char *tabs);
+void ast_print_expression(AST_Expression *expression, char *tabs);
+void ast_print_simple_statement(AST_SimpleStatement *statement, char  *tabs);
+void ast_print_compound_statement(AST_CompoundStatement *statement, char  *tabs);
+void ast_print_decl(decl_t *decl, char *tabs);
 
 #endif
