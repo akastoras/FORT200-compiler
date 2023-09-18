@@ -17,9 +17,16 @@ typedef enum {
 	INT=0, LOG, REAL, CHAR, STR, CMPLX, REC
 } type_t;
 
+// Storing a bool for the type of a list func (i.e access a list node / return the address of the next node)
+// and the number of hops from the head of the list to get to the target node
+typedef struct {
+	bool access;
+	int hops;
+} AST_Listfunc;
+
 // Values representing the op used as sign or addop
 typedef enum {MINUS=-1, NONE=0, PLUS=1} AST_Sign;
- 
+
 // Values representing different relops
 typedef enum {R_GT=0, R_GE, R_LT, R_LE, R_EQ, R_NE} AST_Relop;
 
@@ -411,7 +418,7 @@ AST_Assignment *ast_get_assignment_string(AST_Variable *variable, char *string);
 AST_Expression *ast_get_expression_var(AST_Variable *variable);
 AST_Expression *ast_get_constant_expr(AST_Constant *constant);
 
-AST_Expression *ast_get_expression_unary(AST_Expression *child, unary_op_t op_type);
+AST_Expression *ast_get_expression_unary(unary_op_t op_type, AST_Expression *child);
 AST_Expression *ast_get_expression_unary_notop(AST_Expression *child);
 AST_Expression *ast_get_expression_unary_addop(AST_Expression *child, AST_Sign sign);
 AST_Expression *ast_get_expression_unary_length(AST_Expression *child);

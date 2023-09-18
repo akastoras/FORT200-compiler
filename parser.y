@@ -25,6 +25,7 @@
 	char			charval;
 	char			*strval;
 
+	AST_Listfunc	*list_func;
 	AST_Relop		relopval;
 	AST_Sign		signval;
 	AST_Type		typeval;

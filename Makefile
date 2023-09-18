@@ -27,10 +27,11 @@ parser.tab.c parser.tab.h: $(PARSER) constants.h
 
 $(BIN): $(OBJFILES)
 	gcc $(CFLAGS) $^ -o $@ $(LFLAGS)
-	# -@rm *.tab.* *.yy.c
+	
 
 run: all
 	./$(BIN) tests/test1.f
 
 clean:
 	-@rm build/* parser.output
+# -@rm *.tab.* *.yy.c

@@ -688,7 +688,7 @@ AST_Expression *ast_get_constant_expr(AST_Constant *constant)
 }
 
 // Creates an AST node for a unary expression
-AST_Expression *ast_get_expression_unary(AST_Expression *child, unary_op_t op_type)
+AST_Expression *ast_get_expression_unary(unary_op_t op_type, AST_Expression *child)
 {
 	AST_Expression *new_expr = safe_malloc(sizeof(AST_Expression));
 	new_expr->expr_type = EXPR_UNARY;
@@ -729,28 +729,28 @@ AST_Expression *ast_get_expression_unary(AST_Expression *child, unary_op_t op_ty
 // Create unary expression for notop
 AST_Expression *ast_get_expression_unary_notop(AST_Expression *child)
 {
-	return ast_get_expression_unary(child, U_NOT);
+	return ast_get_expression_unary(U_NOT, child);
 }
 
 // Create unary expression for addop
 AST_Expression *ast_get_expression_unary_addop(AST_Expression *child, AST_Sign sign)
 {
 	if (sign == 1)
-		return ast_get_expression_unary(child, U_PLUS);
+		return ast_get_expression_unary(U_PLUS, child);
 	else
-		return ast_get_expression_unary(child, U_MINUS);
+		return ast_get_expression_unary(U_MINUS, child);
 }
 
 // Create unary expression for addop
 AST_Expression *ast_get_expression_unary_length(AST_Expression *child)
 {
-	return ast_get_expression_unary(child, U_LENGTH);
+	return ast_get_expression_unary(U_LENGTH, child);
 }
 
 // Create unary expression for addop
 AST_Expression *ast_get_expression_unary_new(AST_Expression *child)
 {
-	return ast_get_expression_unary(child, U_NEW);
+	return ast_get_expression_unary(U_NEW, child);
 }
 
 // Creates an AST node for a binary expression

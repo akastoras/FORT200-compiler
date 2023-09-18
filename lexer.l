@@ -50,6 +50,7 @@
 	char *get_character(char *string, char *cdest);
 	double hextod(char *str);
 	double bintod(char *str);
+	AST_Listfunc *get_list_func(char *func, bool access);
 	void yyerror(const char *s);
 	bool in(int value, int *array, int size);
 	int print_token(int token);
@@ -156,6 +157,7 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 "STOP"			{ return print_token(T_STOP); }
 "RETURN"		{ return print_token(T_RETURN); }
 
+
  /* Iconst */
 {ICONST_D}		{ yylval.intval = atoi(yytext); return print_token(T_ICONST); }
 {ICONST_H}		{ yylval.intval = GET_INT_VALUE(yytext, 16); return print_token(T_ICONST); }
@@ -208,7 +210,8 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 \"				{ BEGIN(STRING); }
 
  /* List Functions */
-"C"(AD*|D+)"R"	{ return print_token(T_LISTFUNC); }
+"CA"D*"R"	{ yylval.list_func = get_list_func(yytext, true); return print_token(T_LISTFUNC); }
+"C"D+"R"	{ yylval.list_func = get_list_func(yytext, false); return print_token(T_LISTFUNC); }
 
  /* Identifier */
 {ID}			{ yylval.strval = strdup(yytext); return print_token(T_ID); }
@@ -347,6 +350,17 @@ double hextod(char *str)
 
 	//Calculate the decimal number
 	return (a + ((double) b/pow(16,strlen(ptr))));
+}
+
+AST_Listfunc *get_list_func(char *func, bool access)
+{
+	AST_Listfunc *list_func = safe_malloc(sizeof(AST_Listfunc));
+
+	// The number of hops is equal to the number of 'D' characters in func
+	list_func->access = access;
+	list_func->hops = access ? (strlen(func) - 3) : (strlen(func) - 2);
+
+	return list_func;
 }
 
 void yyerror(const char *s)
