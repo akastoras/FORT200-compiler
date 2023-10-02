@@ -111,7 +111,7 @@
 %token	T_POWEROP	"powerop"
 
 // List Functions
-%token	T_LISTFUNC	"listfunc"
+%token	<list_func>	T_LISTFUNC	"listfunc"
 
 //Other
 %token	T_LPAREN	"lparen"
@@ -126,7 +126,7 @@
 %token	T_EOF	0	"EOF"
 
 // Declaring types for non-terminal variables
-%type <strval> listexpression labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement
+%type <strval> labels if_statement subroutine_call io_statement read_list read_item iter_space step write_list write_item compound_statement branch_statement tail loop_statement
 %type <typeval> type
 %type <constval> constant simple_constant complex_constant value
 %type <signval> sign
@@ -140,12 +140,12 @@
 %type <fields> fields
 %type <declared_variables> declarations
 
-%type <statements> statements;
-%type <body> body;
-%type <header> header;
-%type <params> formal_parameters;
-%type <subprogram> subprogram;
-%type <subprograms> subprograms;
+%type <statements> statements
+%type <body> body
+%type <header> header
+%type <params> formal_parameters
+%type <subprogram> subprogram
+%type <subprograms> subprograms
 %type <program> program
 
 %type <statement> statement
@@ -155,6 +155,7 @@
 %type <goto_statement> goto_statement
 %type <expression> expression
 %type <expressions> expressions
+%type <expression> listexpression
 %type <variable> variable
 %type <assignment> assignment
 
@@ -235,28 +236,28 @@ value:				sign constant { $$ = ast_get_value($1, $2); }
 					| T_STRING { $$ = ast_get_string($1); }
 
 // Get sign as NONE, PLUS, or MINUS
-sign:				T_ADDOP { $$ = ast_get_sign($1); }
-					| %empty { $$ = ast_get_sign(NONE); }
+sign:				T_ADDOP		{ $$ = ast_get_sign($1); }
+					| %empty	{ $$ = ast_get_sign(NONE); }
 
 // In constant just propagate the value of simple or complex constant
 constant:			simple_constant { $$ = $1; }
 					| complex_constant { $$ = $1; }
 
 // Give a type depending on the token returned from lexer, and copy the value
-simple_constant:	T_ICONST { $$ = ast_get_ICONST($1); }
-					| T_RCONST { $$ = ast_get_RCONST($1); }
-					| T_LCONST { $$ = ast_get_LCONST($1); }
-					| T_CCONST { $$ = ast_get_CCONST($1); }
+simple_constant:	T_ICONST	{ $$ = ast_get_ICONST($1); }
+					| T_RCONST	{ $$ = ast_get_RCONST($1); }
+					| T_LCONST	{ $$ = ast_get_LCONST($1); }
+					| T_CCONST	{ $$ = ast_get_CCONST($1); }
 
 // Give the complex type as well as the real and imaginary values of the complex number
 complex_constant:	T_LPAREN T_RCONST T_COLON sign T_RCONST T_RPAREN { $$ = ast_get_CMPLX($2, $4, $5); }
 
 // Create a linked list of statements
-statements:			statements labeled_statement { $$ = ast_insert_statement_to_statements($1, $2); }
-					| labeled_statement { $$ = ast_insert_statement_to_statements(NULL, $1); }
+statements:			statements labeled_statement	{ $$ = ast_insert_statement_to_statements($1, $2); }
+					| labeled_statement				{ $$ = ast_insert_statement_to_statements(NULL, $1); }
 
-labeled_statement:	label statement { $$ = $2; stbl_insert_label($1, $2); }
-					| statement { $$ = $1; }
+labeled_statement:	label statement{ $$ = $2; stbl_insert_label($1, $2); }
+					| statement		{ $$ = $1; }
 
 label:				T_ICONST { $$ = $1; }
 
@@ -264,27 +265,31 @@ label:				T_ICONST { $$ = $1; }
 statement:			simple_statement { $$ = ast_get_statement(SIMPLE, $1); }
 					| compound_statement  { $$ = NULL; }
 
-simple_statement:	assignment { $$ = ast_get_simple_statement(ASSIGNMENT, $1); }
-					| goto_statement { $$ = ast_get_simple_statement(GOTO, $1); }
-					| if_statement  { $$ = NULL; }
-					| subroutine_call  { $$ = NULL; }
-					| io_statement  { $$ = NULL; }
-					| T_CONTINUE  { $$ = NULL; }
-					| T_RETURN  { $$ = NULL; }
-					| T_STOP  { $$ = NULL; }
+simple_statement:	assignment			{ $$ = ast_get_simple_statement(ASSIGNMENT, $1); }
+					| goto_statement	{ $$ = ast_get_simple_statement(GOTO, $1); }
+					| if_statement		{ $$ = NULL; }
+					| subroutine_call	{ $$ = NULL; }
+					| io_statement		{ $$ = NULL; }
+					| T_CONTINUE		{ $$ = NULL; }
+					| T_RETURN			{ $$ = NULL; }
+					| T_STOP			{ $$ = NULL; }
 
 // Assignment from expression or string to variable
 assignment:			variable T_ASSIGN expression { $$ = ast_get_assignment_expression($1, $3); }
 					| variable T_ASSIGN T_STRING { $$ = ast_get_assignment_string($1, $3); }
 
-variable:			variable T_DOT T_ID { $$ = ast_get_variable_rec_access($1, $3);}
-					| variable T_LPAREN expressions T_RPAREN { $$ = NULL;}
-					| T_LISTFUNC T_LPAREN expression T_RPAREN { $$ = NULL;}
-					| T_ID { $$ = ast_get_variable_id($1); }
+// Create node for a variable access
+variable:			variable T_DOT T_ID							{ $$ = ast_get_variable_rec_access($1, $3);}
+					| variable T_LPAREN expressions T_RPAREN	{ $$ = NULL;}
+					| T_LISTFUNC T_LPAREN expression T_RPAREN	{ $$ = ast_get_variable_listfunc($1, $3); }
+					| T_ID										{ $$ = ast_get_variable_id($1); }
 
-expressions:		expressions T_COMMA expression
-					| expression
 
+// Merge many comma seperated expressions in an array
+expressions:		expressions T_COMMA expression	{ $$ = ast_insert_expression_to_expressions($1, $3); }
+					| expression					{ $$ = ast_insert_expression_to_expressions(NULL, $1); }
+
+// Crease node for a single expression
 expression:			expression T_OROP expression			{ $$ = ast_get_expression_binary_orop($1, $3); }
 					| expression T_ANDOP expression			{ $$ = ast_get_expression_binary_andop($1, $3); }
 					| expression T_RELOP expression			{ $$ = ast_get_expression_binary_relop($2, $1, $3); }
@@ -300,11 +305,12 @@ expression:			expression T_OROP expression			{ $$ = ast_get_expression_binary_or
 					| T_NEW T_LPAREN expression T_RPAREN	{ $$ = ast_get_expression_unary_new($3); }
 					| T_LPAREN expression T_RPAREN			{ $$ = $2; }
 					| T_LPAREN expression T_COLON expression T_RPAREN { $$ = ast_get_expression_binary_cmplx($2, $4); }
-					| listexpression
-					| expression error expression { yyerror("Expected operator or seperator ',' between expressions"); yyerrok; }
+					| listexpression						{ $$ = $1; }
+					| expression error expression			{ yyerror("Expected operator or seperator ',' between expressions"); yyerrok; }
 
-listexpression:		T_LBRACK expressions T_RBRACK
-					| T_LBRACK T_RBRACK
+// Create a AST_Expression node for a list expression
+listexpression:		T_LBRACK expressions T_RBRACK	{ $$ = ast_get_listexpression($2); }
+					| T_LBRACK T_RBRACK				{ $$ = ast_get_listexpression(NULL); }
 
 goto_statement:		T_GOTO label { $$ = ast_get_independent_goto($2); }
 					| T_GOTO T_ID T_COMMA T_LPAREN labels T_RPAREN  { $$ = NULL; } //{ $$ = ast_get_computed_goto($2, $5); }

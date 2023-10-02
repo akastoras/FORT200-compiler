@@ -14,7 +14,8 @@ extern char *type_str[];
 int SEM_signable_constant(AST_Sign sign, AST_Constant *constant)
 {
 	if (sign != NONE) {
-		if (constant->type != INT && constant->type != REAL && constant->type != CMPLX) {
+		if (constant->type != INT && constant->type != REAL &&
+			constant->type != CMPLX) {
 			yyerror("<SEM> Incompatible sign with type.");
 			return 1;
 		}
@@ -40,8 +41,9 @@ int SEM_check_initial_value_exists(decl_t *decl)
 	char buffer[MAX_STRING_LENGTH];
 	assert(decl != NULL);
 	if (decl->initial_value == NULL) {
-		sprintf(buffer, "<SEM> Variable '%s' not initialized before use", decl->variable->id);
-		yyerror(buffer);
+		sprintf(buffer, "<SEM> Variable '%s' not initialized before use",
+														decl->variable->id);
+		yyerror(buffer);	
 		return 1;
 	}
 	
@@ -216,7 +218,8 @@ int SEM_check_list_depth(AST_UndefVar *list_node)
 	char buffer[MAX_STRING_LENGTH];
 
 	if (list_node->list_depth > MAX_LIST_DEPTH) {
-		sprintf(buffer, "<SEM> List %s has depth more than the acceptable %d", list_node->id, MAX_LIST_DEPTH);
+		sprintf(buffer, "<SEM> List %s has depth more than the acceptable %d",
+													list_node->id, MAX_LIST_DEPTH);
 		yyerror(buffer);
 		return 1;
 	}
@@ -245,7 +248,7 @@ int SEM_check_duplicate_variable_name(const char *new_id)
 int SEM_check_initialization_position()
 {
 	if (stbl_get_curr_scope() != 1) {
-		yyerror("<SEM> Initialization allowed only at the outermost scope of a unit.");
+		yyerror("<SEM> Initialization allowed at the outermost scope of a unit.");
 		return 1;
 	}
 	else {
@@ -292,11 +295,13 @@ int check_dim_variable(AST_Dim *dim, bool is_param)
 		if (decl->is_parameter && !is_param) {
 			error = 1;
 			char buffer[MAX_STRING_LENGTH];
-			sprintf(buffer, "<SEM> Local array cannot have parameter '%s' as a dimension", id);
+			sprintf(buffer,
+				"<SEM> Local array cannot have parameter '%s' as a dimension", id);
 			yyerror(buffer);
 		}
 		else if (!(decl->is_parameter)) {
-			// When both variables are not parameters, the dimension variable should be initialized
+			/* When both variables are not parameters
+				the dimension variable should be initialized */
 			error = SEM_check_initial_value_exists(decl);
 			if (!error) {
 				dim->type = DIM_LITERAL;
@@ -344,7 +349,10 @@ int SEM_check_expr_datatype(AST_Expression *expr, uint8_t options)
 		return 0;
 	}
 	else {
-		sprintf(buffer, "<SEM> Expression has type %s which is incompatible with expression.", type_str[expr->datatype->type]);
+		sprintf(buffer,
+			"<SEM> Expression has type %s which is incompatible with expression.",
+			type_str[expr->datatype->type]);
+
 		yyerror(buffer);
 		return 1;
 	}
@@ -364,13 +372,11 @@ int SEM_typecheck_variable(AST_Variable *variable, type_t type, char *string)
 	return 0;
 }
 
-// Check if a variable is list
-int SEM_check_list(AST_Expression *expr)
+// Check if a variable is a list
+int SEM_check_expression_list(AST_Expression *expr)
 {
 	char buffer[MAX_STRING_LENGTH];
 
-	// Find the option value of the datatype of the expression
-	// and check if it exists in the options
 	if (expr->list_depth != 0) {
 		return 0;
 	}
@@ -379,4 +385,61 @@ int SEM_check_list(AST_Expression *expr)
 		yyerror(buffer);
 		return 1;
 	}
+}
+
+// Check if variable is not a list
+int SEM_check_expression_not_list(AST_Expression *expr)
+{
+	char buffer[MAX_STRING_LENGTH];
+
+	if (expr->list_depth == 0) {
+		return 0;
+	}
+	else {
+		sprintf(buffer, "<SEM> Expression is list");
+		yyerror(buffer);
+		return 1;
+	}
+}
+
+// Check if variable is not an array
+int SEM_check_expression_not_array(AST_Expression *expr)
+{
+	char buffer[MAX_STRING_LENGTH];
+
+	if (expr->dims == NULL) {
+		return 0;
+	}
+	else {
+		sprintf(buffer, "<SEM> Expression is array");
+		yyerror(buffer);
+		return 1;
+	}
+}
+
+/* At the moment it is only used to ensure a
+  list expression has expressions of the same datatype */
+int SEM_check_same_datatypes(AST_GeneralType *datatype1, AST_GeneralType *datatype2)
+{
+	char buffer[MAX_STRING_LENGTH];
+	assert(datatype1 != NULL && datatype2 != NULL);
+	if (datatype1->type != datatype2->type) {
+		sprintf(buffer, "<SEM> Datatypes are not the same");
+		yyerror(buffer);
+		return 1;
+	}
+	return 0;
+}
+
+// Check if nested lists are of different depths
+int SEM_check_same_list_depth(int list_depth1, int list_depth2)
+{
+	char buffer[MAX_STRING_LENGTH];
+	
+	if (list_depth1 != list_depth2) {
+		sprintf(buffer, "<SEM> Nested lists do not have the same depth");
+		yyerror(buffer);
+		return 1;
+	}
+	return 0;
 }

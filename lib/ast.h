@@ -174,6 +174,7 @@ typedef struct expression {
 	expr_type_t expr_type;
 	AST_GeneralType *datatype;
 	int list_depth; // 0 if not list
+	AST_Dims *dims;
 
 	union {
 		// Unary: Expressions with one expression child
@@ -203,7 +204,7 @@ typedef struct expression {
 // Array of expressions
 struct expressions {
 	int size;
-	AST_Expressions **elements;
+	AST_Expression **elements;
 };
 
 typedef enum {V_ID, V_DECL, V_FUNC_CALL, V_ARRAY_ACCESS, V_REC_ACCESS, V_LISTFUNC} variable_type_t;
@@ -212,6 +213,8 @@ typedef enum {V_ID, V_DECL, V_FUNC_CALL, V_ARRAY_ACCESS, V_REC_ACCESS, V_LISTFUN
 struct variable {
 	variable_type_t type;
 	AST_GeneralType *datatype;
+	int list_depth;
+	AST_Dims *dims;
 
 	union {
 		// V_ID
@@ -240,7 +243,7 @@ struct variable {
 
 		// V_LISTFUNC
 		struct {
-			void *listfunc;
+			AST_Listfunc *listfunc;
 			AST_Expression *list;
 		};
 	};
@@ -434,8 +437,14 @@ AST_Expression *ast_get_expression_binary_divop(AST_Expression *child1, AST_Expr
 AST_Expression *ast_get_expression_binary_pwrop(AST_Expression *child1, AST_Expression *child2);
 AST_Expression *ast_get_expression_binary_cmplx(AST_Expression *child1, AST_Expression *child2);
 
+AST_Expression *ast_get_listexpression(AST_Expressions *exprs);
+
+AST_Expressions *ast_insert_expression_to_expressions(AST_Expressions *exprs,
+													AST_Expression *expr);
+
 // Variable
 AST_Variable *ast_get_variable_id(char *);
+AST_Variable *ast_get_variable_listfunc(AST_Listfunc *listfunc, AST_Expression *list);
 AST_Variable *ast_get_variable_rec_access(AST_Variable *rec, char *field_id);
 
 
@@ -454,7 +463,7 @@ AST_Program *ast_get_program(AST_Body *, AST_Subprograms *);
 void ast_print_values(AST_Values *);
 void ast_print_body(AST_Body *, char *);
 void ast_print_subprogram(AST_Subprogram *);
-void ast_print_variable(AST_UndefVar *variable, char *tabs);
+void ast_print_undefVar(AST_UndefVar *variable, char *tabs);
 void ast_print_expression(AST_Expression *expression, char *tabs);
 void ast_print_simple_statement(AST_SimpleStatement *statement, char  *tabs);
 void ast_print_compound_statement(AST_CompoundStatement *statement, char  *tabs);

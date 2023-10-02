@@ -1,9 +1,8 @@
-integer i, j
-record integer a, list list b logical l endrec r1
+integer i, j, list list l
 logical hello
-data i/2/, r1/1,3,.FALSE./
+data i/2/
 goto 100
-r1.a = i + 1
+l = [[1, 2], [3, 4, 5]]
 100 hello = .TRUE.
 hello = .NOT. hello
 end

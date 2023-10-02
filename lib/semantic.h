@@ -17,7 +17,6 @@ enum options {
 	O_RECORD	= 0x40,	// 1000000
 };
 
-
 int SEM_signable_constant(AST_Sign, AST_Constant *);
 int SEM_check_existing_variable(decl_t *, char *);
 int SEM_check_initial_value_exists(decl_t *);
@@ -31,7 +30,11 @@ int SEM_check_existing_arguments(AST_Params *, char *);
 int SEM_check_declared_dims(AST_Dims *, bool);
 int SEM_check_existing_record_field(AST_Field *field, char *rec_id, char *field_id);
 int SEM_check_expr_datatype(AST_Expression *expr, uint8_t);
-int SEM_check_list(AST_Expression *child);
+int SEM_check_expression_list(AST_Expression *expr);
+int SEM_check_expression_not_list(AST_Expression *expr);
+int SEM_check_expression_not_array(AST_Expression *expr);
+int SEM_check_same_datatypes(AST_GeneralType *datatype1, AST_GeneralType *datatype2);
+int SEM_check_same_list_depth(int list_depth1, int list_depth2);
 
 // Typechecking for variables
 int SEM_typecheck_variable(AST_Variable *, type_t , char *string);
