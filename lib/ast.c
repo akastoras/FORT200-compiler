@@ -12,11 +12,15 @@
 
 /***** Globals *****/
 
+// Used by the ast node generation to identify if it
+// currently generates the body of a certain function
+char *func_id = NULL;
+
 int statement_counter = 0;
 
 // Global array with all references to a label
 label_uses_t label_uses = { .size = 0, .elements = NULL };
-
+unmatched_expr_uses_t unmatched_expr_uses = { .size = 0, .elements = NULL };
 
 // Malloc with safety
 void *safe_malloc(size_t size)
@@ -220,7 +224,7 @@ AST_Dim *ast_get_dim_variable(char *id)
 	return dim;
 }
 
-// Create or append to dimentions
+// Create or append to dimensions
 AST_Dims *ast_insert_dim_to_dims(AST_Dims *dims, AST_Dim *dim)
 {
 	AST_Dims *new_dims;
@@ -370,6 +374,7 @@ AST_Decls *ast_insert_decl_to_decls(AST_Decls *old_decls, type_t type,
 		new_decl->datatype->type = type;
 		new_decl->datatype->fields = fields;
 		new_decl->variable = vars->elements[i];
+		new_decl->initial_value = NULL;
 
 		AST_Dims *dims = new_decl->variable->dims;
 		if (dims != NULL) {
@@ -393,7 +398,6 @@ void ast_insert_init_in_decls(AST_Vals *vals)
 	AST_Values *curr_value_list;
 	char *curr_id;
 	decl_t *entry;
-	int error;
 
 	for(int i = 0; i < vals->size; i++) {
 		curr_val = vals->elements[i];
@@ -402,13 +406,11 @@ void ast_insert_init_in_decls(AST_Vals *vals)
 		
 		// Find decl of variable from symbol table
 		entry = stbl_search_variable(curr_id);
-		error = SEM_check_existing_variable(entry, curr_id);
+		SEM_check_existing_variable(entry, curr_id);
 		
-		// Function not implemented
-		if (!error)
-			error =	SEM_check_compatible_initialization(entry, curr_value_list);
-		if (!error)
-			entry->initial_value = curr_value_list;
+		// TODO:Function not implemented
+		// SEM_check_compatible_initialization(entry, curr_value_list);
+		entry->initial_value = curr_value_list;
 	}
 }
 
@@ -561,6 +563,198 @@ AST_SimpleStatement *ast_get_simple_statement(simple_statement_type_t type, void
 	return stmt;
 }
 
+/* Functions for performing backpatching */
+
+// Insert function call to the table of unmatched expressions
+void insert_unmatched_expr_use(AST_Expression *expr, uint8_t possible_types,
+							bool is_subroutine)
+{
+	// Create space in unmatched_expr_uses for new unmatched_expr_use
+	unmatched_expr_uses.size++;
+	unmatched_expr_uses.elements = safe_realloc(unmatched_expr_uses.elements,
+									unmatched_expr_uses.size * sizeof(unmatched_expr_use_t));
+									
+	// Create new unmatched_expr_use struct
+	unmatched_expr_use_t *new_unmatched_expr_use = safe_malloc(sizeof(unmatched_expr_use_t));
+	new_unmatched_expr_use->expr = expr;
+	new_unmatched_expr_use->possible_types = possible_types;
+	new_unmatched_expr_use->is_subroutine = is_subroutine;
+
+	// Insert element into table of unmatched variable
+	unmatched_expr_uses.elements[unmatched_expr_uses.size-1] = new_unmatched_expr_use;
+}
+
+// Find a function call expression inside the unmatched expressions table
+unmatched_expr_use_t *search_unmatched_expr_use(AST_Expression *expr)
+{
+	for (int i = 0; i < unmatched_expr_uses.size; i++) {
+		if (unmatched_expr_uses.elements[i]->expr == expr)
+			return unmatched_expr_uses.elements[i];
+	}
+
+	return NULL;
+}
+
+void impose_constraint_recursively(AST_Expression *expr, uint8_t possible_types)
+{
+	unmatched_expr_use_t *parent = search_unmatched_expr_use(expr);
+	assert(parent != NULL);
+
+	// Compute the intersection of the current and the given possible types
+	parent->possible_types = parent->possible_types & possible_types;
+
+	if (expr->expr_type == EXPR_BINARY) {
+		AST_Expression *child1 = expr->binary.child1;
+		AST_Expression *child2 = expr->binary.child2;
+		type_t child1_type = child1->datatype->type;
+		type_t child2_type = child2->datatype->type;
+		
+		switch (expr->binary.op)
+		{
+		case B_PLUS:
+		case B_MINUS:
+		case B_MUL:
+		case B_DIV:
+			if (parent->possible_types == O_INTEGER) {
+				if (child1_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child1, O_INTEGER);
+				else
+					impose_constraint_recursively(child1, O_INTEGER);
+				
+				if (child2_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child2, O_INTEGER);
+				else
+					impose_constraint_recursively(child2, O_INTEGER);
+			}
+			else if (parent->possible_types == O_REAL ||
+					parent->possible_types == (O_INTEGER | O_REAL)) {
+				if (child1_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+				else
+					impose_constraint_recursively(child1, O_INTEGER | O_REAL);
+				
+				if (child2_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+				else
+					impose_constraint_recursively(child2, O_INTEGER | O_REAL);
+			}
+			
+			break;
+		case B_POWER:
+			if (parent->possible_types == O_INTEGER) {
+				if (child1_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child1, O_INTEGER);
+				else
+					impose_constraint_recursively(child1, O_INTEGER);
+				
+				if (child2_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child2, O_INTEGER);
+				else
+					impose_constraint_recursively(child2, O_INTEGER);
+			}
+			else if (parent->possible_types == O_REAL) {
+				if (child1_type != AMBIGUOUS && child2_type == AMBIGUOUS) {
+					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+					
+					if(child1_type == REAL)
+						impose_constraint_recursively(child2, O_INTEGER | O_REAL);
+					else if(child1_type == INT)
+						impose_constraint_recursively(child2, O_REAL);
+				}
+				else if (child2_type != AMBIGUOUS && child1_type == AMBIGUOUS) {
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+					
+					if(child2_type == REAL)
+						impose_constraint_recursively(child1, O_INTEGER | O_REAL);
+					else if(child2_type == INT)
+						impose_constraint_recursively(child1, O_REAL);
+				}
+				else { // Both children are AMBIGUOUS
+					impose_constraint_recursively(child1, O_INTEGER | O_REAL);
+					impose_constraint_recursively(child2, O_INTEGER | O_REAL);
+				}
+			}
+			else if (parent->possible_types == O_COMPLEX) {
+				if (child1_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child1, O_COMPLEX);
+				else
+					impose_constraint_recursively(child1, O_COMPLEX);
+				
+				if (child2_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child2, O_INTEGER);
+				else
+					impose_constraint_recursively(child2, O_INTEGER);
+			}
+			else if (parent->possible_types == (O_INTEGER | O_REAL)) {
+				if (child1_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+				else
+					impose_constraint_recursively(child1, O_INTEGER | O_REAL);
+				
+				if (child2_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+				else
+					impose_constraint_recursively(child2, O_INTEGER | O_REAL);
+			}
+			else if (parent->possible_types == (O_INTEGER | O_COMPLEX)) {
+				if (child1_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child1, O_INTEGER | O_COMPLEX);
+				else
+					impose_constraint_recursively(child1, O_INTEGER | O_COMPLEX);
+				
+				if (child2_type != AMBIGUOUS)
+					SEM_check_expr_datatype(child2, O_INTEGER);
+				else
+					impose_constraint_recursively(child2, O_INTEGER);
+			}			
+			else if (parent->possible_types == (O_REAL | O_COMPLEX)){
+				if (child1_type != AMBIGUOUS && child2_type == AMBIGUOUS) {
+					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+					
+					if(child1_type == INT)
+						impose_constraint_recursively(child2, O_REAL);
+					else if(child1_type == REAL)
+						impose_constraint_recursively(child2, O_INTEGER | O_REAL);
+					else
+						impose_constraint_recursively(child2, O_INTEGER);
+				}
+				else if (child2_type != AMBIGUOUS && child1_type == AMBIGUOUS) {
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+					
+					if(child2_type == INT)
+						impose_constraint_recursively(child1, O_REAL | O_COMPLEX);
+					else if(child2_type == REAL)
+						impose_constraint_recursively(child1, O_INTEGER | O_REAL);
+				}
+			}
+			
+			break;
+		default:
+			break;
+		}
+	}
+	else if (expr->expr_type == EXPR_UNARY) {
+		assert(expr->unary.child->datatype->type == AMBIGUOUS);
+		impose_constraint_recursively(expr->unary.child, parent->possible_types);
+	}
+	else if (expr->expr_type == EXPR_LISTEXPR) {
+		for (int i = 0; i < expr->listexpr->size; i++) {
+			if (expr->listexpr->elements[i]->datatype->type != AMBIGUOUS)
+				SEM_check_expr_datatype(expr->listexpr->elements[i], parent->possible_types);
+			else
+				impose_constraint_recursively(expr->listexpr->elements[i], parent->possible_types);
+		}
+	}
+	else if (expr->expr_type == EXPR_VARIABLE) {
+		if (expr->variable->type == V_LISTFUNC) {
+			assert(expr->variable->list->datatype->type == AMBIGUOUS);
+			impose_constraint_recursively(expr->variable->list, parent->possible_types);
+		}
+	}
+
+	return;
+}
+
 // Search for an id that is a field in a record and return the field and
 // the position/index of the id in the AST_Vars array of the field
 AST_Field* ast_search_field_in_record(AST_GeneralType *datatype, char *field_id,
@@ -589,80 +783,57 @@ AST_Field* ast_search_field_in_record(AST_GeneralType *datatype, char *field_id,
 }
 
 // Transforms variables from id to decl
-int ast_variable_id2decl(AST_Variable *variable)
+int ast_variable_id2decl(AST_Variable *variable, bool can_be_func)
 {	
-	if (variable->type != V_ID) {
-		return 1;
-	}
-
 	decl_t *decl = stbl_search_variable(variable->id);
 
-	if (SEM_check_existing_variable(decl, variable->id)) {
-		return 1;
+	// Variable has been declared
+	if (decl) {
+		variable->type = V_DECL;
+		variable->decl = decl;
+		variable->list_depth = decl->variable->list_depth;
+		variable->datatype = decl->datatype;
+		variable->dims = decl->variable->dims;
+
+		return 0;
+	}
+	// Undeclared variable which cannot be a function
+	else if (!can_be_func) {
+		SEM_check_existing_variable(decl, variable->id);
 	}
 
-	variable->type = V_DECL;
-	variable->decl = decl;
-	variable->list_depth = decl->variable->list_depth;
-	variable->datatype = decl->datatype;
-	variable->dims = decl->variable->dims;
-
-	return 0;
+	return 1;
 }
-
-// Get a variable struct
-AST_Variable *ast_get_variable_id(char *id)
-{	
-	AST_Variable *new_variable = safe_malloc(sizeof(AST_Variable));
-	new_variable->type = V_ID;
-	new_variable->datatype = NULL;
-	new_variable->list_depth = 0;
-	new_variable->dims = NULL;
-	new_variable->id = id;
-	
-	return new_variable;
-}
-
-// Create a variable struct for a list access
-AST_Variable *ast_get_variable_listfunc(AST_Listfunc *listfunc, AST_Expression *list)
-{
-	AST_Variable *new_variable = safe_malloc(sizeof(AST_Variable));
-	new_variable->type = V_LISTFUNC;
-	new_variable->datatype = list->datatype;
-
-	if (SEM_check_expression_list(list))
-		return NULL;
-
-	if (listfunc->access == true) {
-		new_variable->list_depth = list->list_depth - 1;
-	}
-	else {
-		new_variable->list_depth = list->list_depth;
-	}
-	
-	return new_variable;
-}
-
 
 // Create a record access node
 AST_Variable *ast_get_variable_rec_access(AST_Variable *rec, char *field_id)
 {
 	int position_in_vars;
+	char *rec_id;
 	
 	// If the rec is in ID form change it to decl
 	if (rec->type == V_ID)
-		ast_variable_id2decl(rec);
+		ast_variable_id2decl(rec, false);
 
-	// Make sure no rec->type related bug exists here
-	assert(rec->type != V_FUNC_CALL && rec->type != V_ID);
+	/* Variable rec cannot be an ID (it should have become a DECL) or a
+	   a FUNC_CALL since functions cannot return a record */
+	SEM_check_variable_type(rec, O_DECL | O_ARRAY_ACCESS | O_REC_ACCESS | O_LISTFUNC);
 	
-	SEM_check_decl_datatype_simple(rec->decl->datatype, REC, rec->id);
-	AST_Field* field = ast_search_field_in_record(rec->decl->datatype,
+	// Find the record's id for use in debugging messages
+	if (rec->type == V_DECL)
+		rec_id = rec->decl->variable->id;
+	else if (rec->type == V_REC_ACCESS)
+		rec_id = rec->field_var->id;
+	else if (rec->type == V_ARRAY_ACCESS)
+		rec_id = rec->array->id;
+	else // rec->type == V_LISTFUNC
+		rec_id = NULL;
+
+	// TODO: We don't need SEM_typecheck_variable(rec, REC, rec_id) as well
+	SEM_check_decl_datatype_simple(rec->datatype, REC, rec_id);
+	AST_Field* field = ast_search_field_in_record(rec->datatype,
 											field_id, &position_in_vars);
-	
-	if (SEM_check_existing_record_field(field, rec->id, field_id)) {
-		return NULL;
-	}
+	SEM_check_existing_record_field(field, rec_id, field_id);
 
 	// Create new node for new_variable
 	AST_Variable *new_variable = safe_malloc(sizeof(AST_Variable));
@@ -686,20 +857,110 @@ AST_Variable *ast_get_variable_rec_access(AST_Variable *rec, char *field_id)
 	return new_variable;
 }
 
+AST_Variable *ast_get_variable_array_access(AST_Variable *variable, AST_Expressions *exprs)
+{
+	/* Ensure the variable is either an ID (which might be found in the sumbol table)
+	   or a record access (which can possibly be an array field) */
+	SEM_check_variable_type(variable, O_ID | O_REC_ACCESS);
+	
+	// If variable is an ID, try to find an array declaration
+	if (variable->type == V_ID) {
+		// if there is not an array declaration, it can only be a function call
+		if (ast_variable_id2decl(variable, true) != 0) {
+			variable->type = V_FUNC_CALL;
+			AST_GeneralType *new_datatype = safe_malloc(sizeof(AST_GeneralType));
+			new_datatype->type = AMBIGUOUS;
+			new_datatype->fields = NULL;
+			variable->datatype = new_datatype;
+			variable->exprs = exprs;
+		}
+		else {
+			SEM_check_valid_array_access(variable->decl->variable, exprs);
+			variable->type = V_ARRAY_ACCESS;
+			variable->array = variable->decl->variable;
+			variable->indices = exprs;
+		}
+	}
+	else if (variable->type == V_REC_ACCESS) {
+		SEM_check_valid_array_access(variable->field_var, exprs);
+		AST_Variable *new_variable = safe_malloc(sizeof(AST_Variable));
+		new_variable->type = V_ARRAY_ACCESS;
+		new_variable->datatype = variable->datatype;
+		new_variable->list_depth = variable->list_depth;
+		new_variable->dims = variable->dims;
+		new_variable->array = variable->field_var;
+		new_variable->indices = exprs;
+
+		return new_variable;
+	}
+
+	return variable;
+}
+
+// Get a variable struct
+AST_Variable *ast_get_variable_id(char *id)
+{	
+	AST_Variable *new_variable = safe_malloc(sizeof(AST_Variable));
+	new_variable->type = V_ID;
+	new_variable->datatype = NULL;
+	new_variable->list_depth = 0;
+	new_variable->dims = NULL;
+	new_variable->id = id;
+	new_variable->exprs = NULL;
+	
+	return new_variable;
+}
+
+AST_Variable *ast_get_variable_listfunc(AST_Listfunc *listfunc, AST_Expression *list)
+{
+	AST_Variable *new_variable = safe_malloc(sizeof(AST_Variable));
+	new_variable->type = V_LISTFUNC;
+	new_variable->datatype = list->datatype;
+
+	SEM_check_expression_list(list);
+
+	if (list->expr_type == EXPR_LISTEXPR) {
+		SEM_check_valid_listexpr_hops(list->listexpr, listfunc->hops);
+		for (int i = 0; i < listfunc->hops; i++) {
+			list->listexpr->elements[i] = list->listexpr->elements[listfunc->hops + i];
+		}
+		list->listexpr->size -= listfunc->hops;
+		list->listexpr->elements = safe_realloc(list->listexpr->elements,
+										list->listexpr->size * sizeof(AST_Expression));
+	}
+
+	if (listfunc->access == true)
+		new_variable->list_depth = list->list_depth - 1;
+	else
+		new_variable->list_depth = list->list_depth;
+
+	new_variable->listfunc = listfunc;
+	new_variable->list = list;
+	
+	return new_variable;
+}
+
 /* Functions for creating expression nodes */
 
 // Create an expression node that is a variable
 AST_Expression *ast_get_expression_var(AST_Variable *variable)
-{
+{	
+	// At this point only scalar variables can be of ID type
 	if (variable->type == V_ID)
-		ast_variable_id2decl(variable);
+		ast_variable_id2decl(variable, false);
 
 	AST_Expression *new_expr = safe_malloc(sizeof(AST_Expression));
 	new_expr->expr_type = EXPR_VARIABLE;
-	new_expr->variable = variable;	
+	new_expr->variable = variable;
 	new_expr->datatype = variable->datatype;
 	new_expr->list_depth = variable->list_depth;
 	new_expr->dims = variable->dims;
+
+	// Any expression that can only be/uses a function call should be stored in the unmatched table
+	if (variable->datatype->type == AMBIGUOUS) {
+		uint8_t possible_types = O_INTEGER | O_LOGICAL | O_REAL | O_CHARACTER | O_COMPLEX;
+		insert_unmatched_expr_use(new_expr, possible_types, false);
+	}
 
 	return new_expr;
 }
@@ -710,7 +971,7 @@ AST_Expression *ast_get_constant_expr(AST_Constant *constant)
 	AST_Expression *new_expr = safe_malloc(sizeof(AST_Expression));
 	new_expr->expr_type = EXPR_CONSTANT;
 	new_expr->constant = constant;
-	new_expr->datatype =safe_malloc(sizeof(AST_GeneralType));
+	new_expr->datatype = safe_malloc(sizeof(AST_GeneralType));
 	new_expr->datatype->type = constant->type;
 	new_expr->datatype->fields = NULL;
 	new_expr->dims = NULL;
@@ -718,6 +979,46 @@ AST_Expression *ast_get_constant_expr(AST_Constant *constant)
 	printf("Create expression %p from constant with type %d\n",new_expr,
 															constant->type);
 	return new_expr;
+}
+
+/* Functions used for typecasting number constants */
+
+/* if expr1 is an integer constant and expr2 is a real number
+   typecast expr1 to a real constant */
+void ast_typecast_int2real(AST_Expression *expr1, AST_Expression *expr2)
+{
+	if (expr2->datatype->type == REAL &&
+		expr1->datatype->type == INT &&
+		expr1->expr_type == EXPR_CONSTANT) {
+		expr1->constant->type = REAL;
+		expr1->constant->rval = (double) expr1->constant->intval;
+	}
+}
+
+/* if expr1 is an integer constant and expr2 is a cmplx number
+   typecast expr1 to a cmplx constant */
+void ast_typecast_int2cmplx(AST_Expression *expr1, AST_Expression *expr2)
+{
+	if (expr2->datatype->type == CMPLX &&
+		expr1->datatype->type == INT &&
+		expr1->expr_type == EXPR_CONSTANT) {
+		expr1->constant->type = CMPLX;
+		expr1->constant->cmplxval.re = (double) expr1->constant->intval;
+		expr1->constant->cmplxval.im = 0.0;
+	}
+}
+
+/* if expr1 is an real constant and expr2 is a cmplx number
+   typecast expr1 to a cmplx constant */
+void ast_typecast_real2cmplx(AST_Expression *expr1, AST_Expression *expr2)
+{
+	if (expr2->datatype->type == CMPLX &&
+		expr1->datatype->type == REAL &&
+		expr1->expr_type == EXPR_CONSTANT) {
+		expr1->constant->type = CMPLX;
+		expr1->constant->cmplxval.re = expr1->constant->rval;
+		expr1->constant->cmplxval.im = 0.0;
+	}
 }
 
 // Creates an AST node for a unary expression
@@ -732,35 +1033,48 @@ AST_Expression *ast_get_expression_unary(unary_op_t op_type, AST_Expression *chi
 	{
 	case U_PLUS:
 	case U_MINUS:
-		if (SEM_check_expression_not_array(child) ||
-			SEM_check_expression_not_list(child) ||
-			SEM_check_expr_datatype(child, O_INTEGER | O_REAL | O_COMPLEX))
-			return NULL;
 		new_expr->datatype = child->datatype;
 		new_expr->list_depth = 0;
+		if (child->datatype->type != AMBIGUOUS) {
+			SEM_check_expression_not_list(child);
+			SEM_check_expr_datatype(child, O_INTEGER | O_REAL | O_COMPLEX);
+		}
+		else {
+			insert_unmatched_expr_use(new_expr, O_INTEGER | O_REAL | O_COMPLEX, false);
+			impose_constraint_recursively(child, O_INTEGER | O_REAL | O_COMPLEX);
+		}
+		
 		break;
-	case U_NOT:
-		if (SEM_check_expression_not_array(child) ||
-			SEM_check_expression_not_list(child) ||
-			SEM_check_expr_datatype(child, O_LOGICAL))
-			return NULL;
-		new_expr->datatype = child->datatype;
-		new_expr->list_depth = 0;
+	case U_NOT: 
+		if (child->datatype->type != AMBIGUOUS) {
+			SEM_check_expression_not_list(child);
+			SEM_check_expr_datatype(child, O_LOGICAL);
+			new_expr->datatype = child->datatype;
+			new_expr->list_depth = 0;
+		}
+		else {
+			new_expr->datatype = safe_malloc(sizeof(AST_GeneralType));
+			new_expr->datatype->type = LOG;
+			new_expr->datatype->fields = NULL;
+			new_expr->list_depth = 0;
+			impose_constraint_recursively(child, O_LOGICAL);
+		}
 		break;
 	case U_LENGTH:
-		if (SEM_check_expression_not_array(child) ||
-			SEM_check_expression_list(child))
-			return NULL;
+		SEM_check_expression_list(child);
 		new_expr->datatype = safe_malloc(sizeof(AST_GeneralType));
 		new_expr->datatype->type = INT;
 		new_expr->datatype->fields = NULL;
 		new_expr->list_depth = 0;
 		break;
 	case U_NEW:
-		if (SEM_check_expression_not_array(child))
-			return NULL;
 		new_expr->datatype = child->datatype;
 		new_expr->list_depth = child->list_depth + 1;
+		if (child->datatype->type == AMBIGUOUS) {
+			unmatched_expr_use_t *unmatched_child = search_unmatched_expr_use(child);
+			assert(unmatched_child == NULL);
+			insert_unmatched_expr_use(new_expr, unmatched_child->possible_types, false);
+		}
 		break;
 	default:
 		break;
@@ -808,73 +1122,223 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 
 	new_expr->datatype = safe_malloc(sizeof(AST_GeneralType));
 	new_expr->datatype->fields = NULL;
-	
+
+	SEM_check_expression_not_list(child1);
+	SEM_check_expression_not_list(child2);
+
 	switch (operation)
 	{
 	case B_OR:
 	case B_AND:
+		if (child1->datatype->type != AMBIGUOUS)
+			SEM_check_expr_datatype(child1, O_LOGICAL);
+		else
+			impose_constraint_recursively(child1, O_LOGICAL);
+
+		if (child2->datatype->type != AMBIGUOUS)
+			SEM_check_expr_datatype(child2, O_LOGICAL);
+		else
+			impose_constraint_recursively(child2, O_LOGICAL);
+
 		new_expr->datatype->type = LOG;
-		if (SEM_check_expression_not_array(child1) ||
-			SEM_check_expression_not_list(child1) ||
-			SEM_check_expr_datatype(child1, O_LOGICAL | O_INTEGER | O_REAL))
-			return NULL;
-		if (SEM_check_expression_not_array(child2) ||
-			SEM_check_expression_not_list(child2) ||
-			SEM_check_expr_datatype(child2, O_LOGICAL | O_INTEGER | O_REAL))
-			return NULL;
 		break;
 	case B_PLUS:
 	case B_MINUS:
 	case B_MUL:
 	case B_DIV:
-		// Check valid datatypes of children
-		if (SEM_check_expression_not_array(child1) ||
-			SEM_check_expression_not_list(child1) ||
-			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_COMPLEX))
-			return NULL;
-		
-		if (SEM_check_expression_not_array(child2) ||
-			SEM_check_expression_not_list(child2) ||
-			SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_COMPLEX))
-			return NULL;
+		// Check valid datatypes of children or impose a new constraint if they are ambiguous
+		if (child1->datatype->type != AMBIGUOUS)
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_COMPLEX);
+		else
+			impose_constraint_recursively(child1, O_INTEGER | O_REAL | O_COMPLEX);
 
-		// Find final expr datatype
+		if (child2->datatype->type != AMBIGUOUS)
+			SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_COMPLEX);
+		else
+			impose_constraint_recursively(child2, O_INTEGER | O_REAL | O_COMPLEX);
+
+
+		// Find the new_expr's datatype. Insert it in the unmatched table if it's ambiguous
 		if (child1->datatype->type == CMPLX || child2->datatype->type == CMPLX) {
 			new_expr->datatype->type = CMPLX;
 		}
-		else if (child1->datatype->type == REAL || child2->datatype->type == REAL){
-			new_expr->datatype->type = REAL;
+		else if (child1->datatype->type != AMBIGUOUS && child2->datatype->type != AMBIGUOUS) {
+			if (child1->datatype->type == REAL || child2->datatype->type == REAL)
+				new_expr->datatype->type = REAL;
+			else
+				new_expr->datatype->type = INT;
 		}
 		else {
-			new_expr->datatype->type = INT;
-		}
-	case B_POWER:
-		// Check valid datatypes of children
-		if (SEM_check_expression_not_list(child1) ||
-			SEM_check_expression_not_array(child1) ||
-			SEM_check_expression_not_list(child2) ||
-			SEM_check_expression_not_array(child2)) {
-			return NULL;
+			new_expr->datatype->type = AMBIGUOUS;
+			insert_unmatched_expr_use(new_expr, O_INTEGER | O_REAL | O_COMPLEX, false);
 		}
 
-		SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
-		if(child2->datatype->type == INT) {
+		break;
+	case B_POWER:
+		new_expr->datatype->type = AMBIGUOUS;
+
+		// Ensure the base is either ambiguous or a number
+		if (child1->datatype->type != AMBIGUOUS) {
 			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_COMPLEX);
+
+			// Examine all type combinations of the children
+			if (child1->datatype->type == CMPLX) {
+				if (child2->datatype->type != AMBIGUOUS)
+					SEM_check_expr_datatype(child2, O_INTEGER);
+				else
+					impose_constraint_recursively(child2, O_INTEGER);
+
+				new_expr->datatype->type = CMPLX;
+			}
+			else { // child1->datatype->type == INT | REAL
+				if (child2->datatype->type != AMBIGUOUS)
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+				else
+					impose_constraint_recursively(child2, O_INTEGER | O_REAL);
+
+				if (child1->datatype->type == REAL || child2->datatype->type == REAL)
+					new_expr->datatype->type = REAL;
+				else if (child2->datatype->type == INT)
+					insert_unmatched_expr_use(new_expr, O_INTEGER, false);
+				else
+					insert_unmatched_expr_use(new_expr, O_INTEGER | O_REAL, false);
+			}
 		}
-		else {
+		else { // child1->datatype->type == AMBIGUOUS
+			if (child2->datatype->type != AMBIGUOUS) {
+				SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+				if (child2->datatype->type == INT) {
+					impose_constraint_recursively(child1, O_INTEGER | O_REAL | O_COMPLEX);
+					insert_unmatched_expr_use(new_expr, O_INTEGER | O_REAL | O_COMPLEX, false);	
+				}
+				else { // child2->datatype->type == REAL
+					impose_constraint_recursively(child1, O_INTEGER | O_REAL);
+					new_expr->datatype->type = REAL;
+				}
+			}
+			else { // child2->datatype->type == AMBIGUOUS
+				impose_constraint_recursively(child1, O_INTEGER | O_REAL | O_COMPLEX);
+				impose_constraint_recursively(child2, O_INTEGER | O_REAL);
+				insert_unmatched_expr_use(new_expr, O_INTEGER | O_REAL | O_COMPLEX, false);
+			}
+		}
+
+		break;
+	case B_GT:
+	case B_GE:
+	case B_LT:
+	case B_LE:
+		// Final expr datatype is always logical
+		new_expr->datatype->type = LOG;
+
+		// Check valid pairs of datatypes of children and typecast if necessary
+		if (child1->datatype->type != AMBIGUOUS) {
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_CHARACTER);
+			
+			if (child1->datatype->type == CHAR) {
+				if (child2->datatype->type != AMBIGUOUS)
+					SEM_check_expr_datatype(child2, O_CHARACTER);
+				else
+					impose_constraint_recursively(child2, O_CHARACTER);
+			}
+			else {
+				if (child2->datatype->type != AMBIGUOUS) {
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+					ast_typecast_int2real(child1, child2);
+					ast_typecast_int2real(child2, child1);
+				}
+				else {
+					impose_constraint_recursively(child2, O_INTEGER | O_REAL);
+				}
+			}
+		}
+		else { // child1->datatype->type == AMBIGUOUS
+			if (child2->datatype->type != AMBIGUOUS) {
+				SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_CHARACTER);
+
+				if (child2->datatype->type == CHAR)
+					impose_constraint_recursively(child1, O_CHARACTER);
+				else
+					impose_constraint_recursively(child1, O_INTEGER | O_REAL);
+			}
+			else {
+				impose_constraint_recursively(child1, O_INTEGER | O_REAL | O_CHARACTER);
+				impose_constraint_recursively(child2, O_INTEGER | O_REAL | O_CHARACTER);
+			}
+		}
+
+		break;
+	case B_EQ:
+	case B_NE:
+		// Final expr datatype is always logical
+		new_expr->datatype->type = LOG;
+
+		// Check valid pairs of datatypes of children and typecast if necessary
+		if (child1->datatype->type != AMBIGUOUS) {
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_CHARACTER | O_COMPLEX);
+			
+			if (child1->datatype->type == CHAR) {
+				if (child2->datatype->type != AMBIGUOUS)
+					SEM_check_expr_datatype(child2, O_CHARACTER);
+				else
+					impose_constraint_recursively(child2, O_CHARACTER);
+			}
+			else {
+				if (child2->datatype->type != AMBIGUOUS) {
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_COMPLEX);
+					ast_typecast_int2real(child1, child2);
+					ast_typecast_int2real(child2, child1);
+					ast_typecast_int2cmplx(child1, child2);
+					ast_typecast_int2cmplx(child2, child1);
+					ast_typecast_real2cmplx(child1, child2);
+					ast_typecast_real2cmplx(child2, child1);
+				}
+				else {
+					impose_constraint_recursively(child2, O_INTEGER | O_REAL | O_COMPLEX);
+				}
+			}
+		}
+		else { // child1->datatype->type == AMBIGUOUS
+			if (child2->datatype->type != AMBIGUOUS) {
+				SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_CHARACTER | O_COMPLEX);
+
+				if (child2->datatype->type == CHAR)
+					impose_constraint_recursively(child1, O_CHARACTER);
+				else
+					impose_constraint_recursively(child1, O_INTEGER | O_REAL | O_COMPLEX);
+			}
+			else {
+				impose_constraint_recursively(child1, O_INTEGER | O_REAL | O_CHARACTER | O_COMPLEX);
+				impose_constraint_recursively(child2, O_INTEGER | O_REAL | O_CHARACTER | O_COMPLEX);
+			}
+		}
+
+		break;
+	case B_CMPLX:
+		// Final expr datatype is always complex
+		new_expr->datatype->type = CMPLX;
+
+		if (child1->datatype->type != AMBIGUOUS && child2->datatype->type != AMBIGUOUS) {
 			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+			SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+
+			ast_typecast_int2real(child1, child2);
+			ast_typecast_int2real(child2, child1);
 		}
-		
-		// Find final expr datatype
-		if(child1->datatype->type == CMPLX) {
-			new_expr->datatype->type = CMPLX;
+		else if (child1->datatype->type != AMBIGUOUS) {
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+			impose_constraint_recursively(child2, O_INTEGER | O_REAL);
 		}
-		else if (child1->datatype->type == REAL || child2->datatype->type == REAL){
-			new_expr->datatype->type = REAL;
+		else if (child2->datatype->type != AMBIGUOUS) {
+			SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+			impose_constraint_recursively(child1, O_INTEGER | O_REAL);
 		}
 		else {
-			new_expr->datatype->type = INT;
+			impose_constraint_recursively(child1, O_INTEGER | O_REAL);
+			impose_constraint_recursively(child2, O_INTEGER | O_REAL);
 		}
+
+		break;
 	default:
 		break;
 	}
@@ -970,38 +1434,61 @@ AST_Expressions *ast_insert_expression_to_expressions(AST_Expressions *exprs,
 // Create a list initialization
 AST_Expression *ast_get_listexpression(AST_Expressions *exprs)
 {
-	AST_Expression *expr = safe_malloc(sizeof(AST_Expression));
-	expr->expr_type = EPXR_LISTEXPR;
-	expr->listexpr = exprs;
+	AST_Expression *new_expr = safe_malloc(sizeof(AST_Expression));
+	int element_list_depth;
 
+	new_expr->expr_type = EXPR_LISTEXPR;
+	new_expr->listexpr = exprs;
+
+	// Case of an empty list
 	if (exprs == NULL) {
-		expr->list_depth = 1;
-		expr->datatype = NULL;
-		return expr;
+		new_expr->list_depth = 1;
+		new_expr->datatype = NULL;
+		return new_expr;
 	}
-	
-	// Check that all the elements of the new list have the same
-	// data structure and datatype
-	AST_GeneralType *datatype = exprs->elements[0]->datatype;
-	int element_list_depth = exprs->elements[0]->list_depth;
-	
-	SEM_check_expression_not_array(exprs->elements[0]);
 
-	for (int i = 1; i < exprs->size; i++) {
+	// The list's datatype is the same as its first non-ambiguous element
+	AST_GeneralType *datatype = safe_malloc(sizeof(AST_GeneralType));
+	datatype->type = AMBIGUOUS;
+	datatype->fields = NULL;
+	// TODO: Cover the case of functions that return a list 
+	element_list_depth = 0;
+
+	for (int i = 0; i < exprs->size; i++) {
 		AST_Expression *expr = exprs->elements[i];
-		if (SEM_check_expression_not_array(expr) ||
-			SEM_check_same_datatypes(datatype, expr->datatype) ||
-			SEM_check_same_list_depth(element_list_depth, expr->list_depth))
-			return NULL;
+		SEM_check_expression_not_array(expr);
+
+		if (expr->datatype->type != AMBIGUOUS) {
+			datatype->type = expr->datatype->type;
+			element_list_depth = expr->list_depth;
+			break;
+		}
 	}
 
-	expr->datatype = datatype;
-	expr->list_depth = element_list_depth + 1;
+	new_expr->list_depth = element_list_depth + 1;
+	new_expr->datatype = datatype;
 
-	return expr;
+	// For a non-ambiguous list, force every ambiguous element to inherit its datatype
+	if (datatype->type != AMBIGUOUS) {
+		for (int i = 0; i < exprs->size; i++) {
+			AST_Expression *expr = exprs->elements[i];
+			SEM_check_expression_not_array(expr);
+			SEM_check_same_list_depth(element_list_depth, expr->list_depth);
+			
+			if (expr->datatype->type != AMBIGUOUS)
+				SEM_check_same_datatypes(datatype, expr->datatype);
+			else
+				impose_constraint_recursively(expr, 1 << datatype->type);
+		}
+	}
+	else { // List is an ambiguous expression, so insert it in the unmatched table
+		uint8_t possible_types = O_INTEGER | O_LOGICAL | O_REAL |
+								O_CHARACTER | O_COMPLEX | O_RECORD;
+		insert_unmatched_expr_use(new_expr, possible_types, false);
+	}
+
+	return new_expr;
 }
-
-
 
 /* Functions for assignments */
 
@@ -1009,12 +1496,12 @@ AST_Expression *ast_get_listexpression(AST_Expressions *exprs)
 AST_Assignment *ast_get_assignment_expression(AST_Variable *variable,
 											AST_Expression *expression)
 {
-	if (variable->type == V_ID)
-		ast_variable_id2decl(variable);
-
-	if (SEM_typecheck_variable(variable, expression->datatype->type,
-								"Left hand of assignment"))
-		return NULL;
+	// TODO: The use of a function's name as a variable inside that function
+	// should be handled by maybe making a new variable type... or using V_FUNC_CALL
+	if (variable->type == V_ID) {
+		if (func_id == NULL || strcmp(func_id, variable->id) != 0)
+			ast_variable_id2decl(variable, false);
+	}
 	
 	printf("Create new assignment node with variable and expression\n");
 
@@ -1031,11 +1518,9 @@ AST_Assignment *ast_get_assignment_expression(AST_Variable *variable,
 AST_Assignment *ast_get_assignment_string(AST_Variable *variable, char *string)
 {
 	if (variable->type == V_ID)
-		ast_variable_id2decl(variable);
+		ast_variable_id2decl(variable, false);
 		
-	if (SEM_typecheck_variable(variable, STR, "Left hand of assignment")) {
-		return NULL;
-	}
+	SEM_typecheck_variable(variable, STR, "Left hand of assignment");
 
 	AST_Assignment *asmt = safe_malloc(sizeof(AST_Assignment));
 	
@@ -1079,6 +1564,7 @@ AST_Params *ast_insert_param_to_params(AST_Params *old_params,
 		new_param->datatype = safe_malloc(sizeof(AST_GeneralType));
 		new_param->datatype->type = type;
 		new_param->datatype->fields = NULL; // No field as parameter
+		new_param->initial_value = NULL;
 		new_param->variable = vars->elements[vars->size - i - 1];
 		new_params->elements[old_size + i] = new_param;
 	}
@@ -1133,6 +1619,8 @@ AST_Header *ast_get_header(subprogram_type_t subprogram_type, type_t type,
 		header->ret_type = type;
 	}
 
+	func_id = id;
+
 	return header;
 }
 
@@ -1142,6 +1630,7 @@ AST_Subprogram *ast_get_subprogram(AST_Header *header, AST_Body *body)
 	AST_Subprogram *subprogram = safe_malloc(sizeof(AST_Subprogram));
 	subprogram->header = header;
 	subprogram->body = body;
+	func_id = NULL;
 	return subprogram;
 }
 
@@ -1212,6 +1701,9 @@ char *more_tabs(char *tabs)
 char *functype_str[] = {"SUBROUTINE", "FUNCTION"};
 char *type_str[] = {
 	"INTEGER", "LOGICAL", "REAL", "CHARACTER", "STRING", "COMPLEX", "RECORD"
+};
+char *var_type_str[] = {
+	"ID", "DECL", "FUNC_CALL", "ARRAY_ACCESS", "REC_ACCESS", "LISTFUNC"
 };
 
 // Prints the dimensions of an array
@@ -1507,7 +1999,7 @@ void ast_print_expression(AST_Expression *expression, char *tabs)
 		printf("%sExpression reduces to simple_constant: \n", tabs);
 		ast_print_constant(expression->constant, tabs);
 		break;
-	case EPXR_LISTEXPR:
+	case EXPR_LISTEXPR:
 		printf("%sExpression reduces to list expression: \n", tabs);
 		printf("%s[\n", tabs);
 		ast_print_expressions(expression->listexpr, tabs);

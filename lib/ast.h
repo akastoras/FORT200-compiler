@@ -4,7 +4,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-
+#include <stdint.h>
 
 /****************************************************/
 /********************** STRUCTS *********************/
@@ -14,7 +14,7 @@
 
 // Value representing the type of an expression
 typedef enum {
-	INT=0, LOG, REAL, CHAR, STR, CMPLX, REC
+	INT=0, LOG, REAL, CHAR, STR, CMPLX, REC, AMBIGUOUS
 } type_t;
 
 // Storing a bool for the type of a list func (i.e access a list node / return the address of the next node)
@@ -155,7 +155,7 @@ typedef struct {
 
 
 /** Statement structs **/
-typedef enum {EXPR_UNARY, EXPR_BINARY, EXPR_VARIABLE, EXPR_CONSTANT, EPXR_LISTEXPR} expr_type_t;
+typedef enum {EXPR_UNARY, EXPR_BINARY, EXPR_VARIABLE, EXPR_CONSTANT, EXPR_LISTEXPR} expr_type_t;
 typedef enum {U_PLUS, U_MINUS, U_NOT, U_LENGTH, U_NEW} unary_op_t ;
 typedef enum {
 	// DO NOT THINK OF CHANGING THE ORDER
@@ -218,8 +218,11 @@ struct variable {
 
 	union {
 		// V_ID
-		char *id; // Used initially and transformed to another type when reused
-
+		struct {
+			char *id; // Used initially and transformed to another type when reused
+			AST_Expressions *exprs; // Used temporarily by a yet unidentified func call
+		};
+		
 		// V_DECL
 		decl_t *decl;
 
@@ -330,7 +333,16 @@ typedef struct {
 	label_use_t **elements;
 } label_uses_t;
 
+typedef struct {
+	AST_Expression *expr; // The unmatched expression
+	uint8_t possible_types; // All valid types described by the type_t enum 
+	bool is_subroutine; // Flag which constrains the variable to be a subroutine
+} unmatched_expr_use_t;
 
+typedef struct {
+	int size;
+	unmatched_expr_use_t **elements;
+} unmatched_expr_uses_t;
 
 /** Program structs **/
 
@@ -443,9 +455,10 @@ AST_Expressions *ast_insert_expression_to_expressions(AST_Expressions *exprs,
 													AST_Expression *expr);
 
 // Variable
-AST_Variable *ast_get_variable_id(char *);
-AST_Variable *ast_get_variable_listfunc(AST_Listfunc *listfunc, AST_Expression *list);
 AST_Variable *ast_get_variable_rec_access(AST_Variable *rec, char *field_id);
+AST_Variable *ast_get_variable_array_access(AST_Variable *variable, AST_Expressions *exprs);
+AST_Variable *ast_get_variable_id(char *id);
+AST_Variable *ast_get_variable_listfunc(AST_Listfunc *listfunc, AST_Expression *list);
 
 
 // Program Functions
@@ -468,5 +481,7 @@ void ast_print_expression(AST_Expression *expression, char *tabs);
 void ast_print_simple_statement(AST_SimpleStatement *statement, char  *tabs);
 void ast_print_compound_statement(AST_CompoundStatement *statement, char  *tabs);
 void ast_print_decl(decl_t *decl, char *tabs);
+
+void impose_constraint_recursively(AST_Expression *expr, uint8_t possible_types);
 
 #endif

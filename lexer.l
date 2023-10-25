@@ -110,7 +110,7 @@ RCONST_B	0B({RCONST_B_1}|{RCONST_B_2})
 ""([" "-~]|\\[nftrbv])"'"	{ ptr = get_character(yytext, &c); yylval.charval = c; BEGIN(INITIAL); return print_token(T_CCONST); }
 "'"							{ yyerror("Empty character constant"); BEGIN(INITIAL); }
 <<EOF>>						{ yyerror("End of file inside character constant"); }
-.*"'"						{ yyerror("Unexpected content of character constant"); BEGIN(INITIAL); }
+[^']*'						{ yyerror("Unexpected content of character constant"); BEGIN(INITIAL); }
 }
 
 <STRING>{

@@ -134,10 +134,15 @@ decl_t *stbl_search_variable(const char *key)
 }
 
 // Search for a subprogram in the symbol table
-STBL_Entry *stbl_search_subprogram(const char *key)
+AST_Subprogram *stbl_search_subprogram(const char *key)
 {
 	// subprograms are in scope 0 and scope 0 has only subprograms
-	STBL_Entry *entry = stbl_search_scope(key, 0);
-	assert(entry == NULL || entry->entry_type == SUBPROGRAM);
-	return entry;
+	STBL_Entry *data = stbl_search_scope(key, 0);
+
+	if (data != NULL) {
+		assert(data->entry_type == SUBPROGRAM);
+		return data->subprogram;
+	}
+	
+	return NULL;
 }

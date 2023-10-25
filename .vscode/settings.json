@@ -22,6 +22,7 @@
 		"unordered_map": "c",
 		"unordered_set": "c",
 		"vector": "c",
-		"symbol_table.h": "c"
+		"symbol_table.h": "c",
+		"algorithm": "c"
 	}
 }

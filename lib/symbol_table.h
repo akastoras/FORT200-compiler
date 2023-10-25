@@ -44,6 +44,6 @@ STBL_Entry *stbl_search_scope(const char *, int);
 label_t *stbl_search_label_in_current_scope(int);
 STBL_Entry *stbl_search_current_scope(const char *key);
 decl_t *stbl_search_variable(const char *);
-STBL_Entry *stbl_search_subprogram(const char *);
+AST_Subprogram *stbl_search_subprogram(const char *);
 
 #endif

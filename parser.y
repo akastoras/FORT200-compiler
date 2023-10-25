@@ -279,11 +279,10 @@ assignment:			variable T_ASSIGN expression { $$ = ast_get_assignment_expression(
 					| variable T_ASSIGN T_STRING { $$ = ast_get_assignment_string($1, $3); }
 
 // Create node for a variable access
-variable:			variable T_DOT T_ID							{ $$ = ast_get_variable_rec_access($1, $3);}
-					| variable T_LPAREN expressions T_RPAREN	{ $$ = NULL;}
+variable:			variable T_DOT T_ID							{ $$ = ast_get_variable_rec_access($1, $3); }
+					| variable T_LPAREN expressions T_RPAREN	{ $$ = ast_get_variable_array_access($1, $3); }
 					| T_LISTFUNC T_LPAREN expression T_RPAREN	{ $$ = ast_get_variable_listfunc($1, $3); }
 					| T_ID										{ $$ = ast_get_variable_id($1); }
-
 
 // Merge many comma seperated expressions in an array
 expressions:		expressions T_COMMA expression	{ $$ = ast_insert_expression_to_expressions($1, $3); }
