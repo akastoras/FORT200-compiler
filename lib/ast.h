@@ -234,6 +234,7 @@ struct variable {
 
 		// V_ARRAY_ACCESS
 		struct {
+			AST_Variable *parent_rec; // used for a record field array 
 			AST_UndefVar *array;
 			AST_Expressions *indices;
 		};
@@ -460,7 +461,6 @@ AST_Variable *ast_get_variable_array_access(AST_Variable *variable, AST_Expressi
 AST_Variable *ast_get_variable_id(char *id);
 AST_Variable *ast_get_variable_listfunc(AST_Listfunc *listfunc, AST_Expression *list);
 
-
 // Program Functions
 AST_Params *ast_insert_param_to_params(AST_Params *, type_t, AST_Vars *);
 AST_Header *ast_get_header(subprogram_type_t , type_t, bool, char *, AST_Params *);
@@ -469,19 +469,31 @@ AST_Subprograms *ast_insert_subprogram_to_subprograms(AST_Subprograms *, AST_Sub
 AST_Body *ast_get_body(AST_Decls *, AST_Statements *);
 AST_Program *ast_get_program(AST_Body *, AST_Subprograms *);
 
-
-
-
 // Print Functions
-void ast_print_values(AST_Values *);
+void ast_print_func_call(AST_Header *header, AST_Expressions *args, char *tabs);
+void ast_print_array_access(AST_Variable *variable, char *tabs);
+void ast_print_variable_access(AST_Variable *variable, char *tabs);
+
+void ast_print_datatype(AST_GeneralType *datatype, char *tabs);
+void ast_print_undefVar(AST_UndefVar *variable);
+void ast_print_dims(AST_Dims *dims);
+void ast_print_fields(AST_Fields *fields, char *tabs);
+void ast_print_constant(AST_Constant* constant, char *tabs);
+void ast_print_initial_value(AST_Values *values, char *tabs);
+void ast_print_decl(decl_t *decl, char *tabs);
+void ast_print_decls(AST_Decls *decls, char *tabs);
+
+void ast_print_statements(AST_Statements *statements, char *tabs);
+void ast_print_simple_statement(AST_SimpleStatement *statement, char  *tabs);
+void ast_print_expressions(AST_Expressions *listexpr, char *tabs);
+void ast_print_expression(AST_Expression *expression, char *tabs);
+void ast_print_compound_statement(AST_CompoundStatement *statement, char  *tabs);
 void ast_print_body(AST_Body *, char *);
 void ast_print_subprogram(AST_Subprogram *);
-void ast_print_undefVar(AST_UndefVar *variable, char *tabs);
-void ast_print_expression(AST_Expression *expression, char *tabs);
-void ast_print_simple_statement(AST_SimpleStatement *statement, char  *tabs);
-void ast_print_compound_statement(AST_CompoundStatement *statement, char  *tabs);
-void ast_print_decl(decl_t *decl, char *tabs);
+void ast_print_header(AST_Header *header);
+void ast_print_values(AST_Values *);
 
 void impose_constraint_recursively(AST_Expression *expr, uint8_t possible_types);
+void match_funcs_to_unmatched_exprs();
 
 #endif

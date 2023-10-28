@@ -143,6 +143,6 @@ AST_Subprogram *stbl_search_subprogram(const char *key)
 		assert(data->entry_type == SUBPROGRAM);
 		return data->subprogram;
 	}
-	
+
 	return NULL;
 }

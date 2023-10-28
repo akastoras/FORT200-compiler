@@ -44,7 +44,7 @@ void SEM_check_duplicate_subprogram_name(char *);
 void SEM_check_existing_arguments(AST_Params *, char *);
 void SEM_check_declared_dims(AST_Dims *, bool);
 void SEM_check_existing_record_field(AST_Field *field, char *rec_id, char *field_id);
-void SEM_check_expr_datatype(AST_Expression *expr, uint8_t options);
+void SEM_check_expr_datatype(AST_Expression *expr, uint8_t options, bool compatible);
 void SEM_check_variable_type(AST_Variable *variable, uint8_t options);
 void SEM_check_expression_list(AST_Expression *expr);
 void SEM_check_expression_not_list(AST_Expression *expr);
@@ -53,6 +53,10 @@ void SEM_check_same_datatypes(AST_GeneralType *datatype1, AST_GeneralType *datat
 void SEM_check_same_list_depth(int list_depth1, int list_depth2);
 void SEM_check_valid_listexpr_hops(AST_Expressions *listexpr, int hops);
 void SEM_check_valid_array_access(AST_UndefVar *undef_var, AST_Expressions *exprs);
+void SEM_check_possible_types(unmatched_expr_use_t *expr_use, type_t type);
+void SEM_check_subprog_call_exists(AST_Subprogram *subprogram, char *id);
+void SEM_check_subprogram_type(unmatched_expr_use_t *expr_use, AST_Subprogram *subprogram);
+void SEM_check_func_call_params(AST_Params *params, AST_Expressions *exprs, char *id);
 
 
 // Typechecking for variables

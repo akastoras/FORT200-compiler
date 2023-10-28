@@ -13,7 +13,7 @@
 	#include "parser.tab.h"
 	
 	#define GET_INT_VALUE(text, base) (strtol(text + 2, NULL, base))
-	#define GET_REAL_VALUE(text, base) (base == 16 ? hextod(text): bintod(text))
+	#define GET_REAL_VALUE(text, base) (base == 16 ? hextod(text + 2): bintod(text + 2))
 	#define IS_ID(token) (token==T_ID)
 	#define IS_KEYWORD(token) (in(token, keywords, 27))
 	#define IS_OPERATOR(token) (in(token, operators, 17))
@@ -338,18 +338,17 @@ double hextod(char *str)
 {
 	long long int a, b;
 	char *ptr;
-	char delim[] = ".";
 
 	//Extract the whole number part
-	ptr = strtok(str, delim);
+	ptr = strtok(str, ".");
 	a = strtoll(ptr, NULL, 16);
 
 	//Extract the fractional part
-	ptr = strtok(NULL, delim);
+	ptr = strtok(NULL, ".");
 	b = strtoll(ptr, NULL, 16);
 
 	//Calculate the decimal number
-	return (a + ((double) b/pow(16,strlen(ptr))));
+	return (a + ((double) b/pow(16, strlen(ptr))));
 }
 
 AST_Listfunc *get_list_func(char *func, bool access)

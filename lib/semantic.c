@@ -171,17 +171,27 @@ void SEM_check_existing_record_field(AST_Field *field, char *rec_id, char *field
 	}
 }
 
-void SEM_check_expr_datatype(AST_Expression *expr, uint8_t options)
+void SEM_check_expr_datatype(AST_Expression *expr, uint8_t options, bool compatible)
 {
 	char buffer[MAX_STRING_LENGTH];
 
 	// Find the option value of the datatype of the expression
 	// and check if it exists in the options
+	
 	if (!(options & (1 << expr->datatype->type))) {
-		sprintf(buffer,
-			"Expression has type %s which is incompatible with that expression.",
+		if (compatible) {
+			sprintf(buffer,
+			"Expression has type %s which is incompatible with that expression",
 			type_str[expr->datatype->type]);
-		SEM_error(buffer);
+			SEM_error(buffer);
+		}
+		else {
+			sprintf(buffer,
+			"Type %s is not one of the possible types of the expresion",
+			type_str[expr->datatype->type]);
+			SEM_error(buffer);
+		}
+		
 	}
 }
 
@@ -413,7 +423,104 @@ void SEM_check_valid_array_access(AST_UndefVar *undef_var, AST_Expressions *expr
 			sprintf(buffer, "Unknown type of expression used as a dimension "
 						"to access array %s", undef_var->id);
 			SEM_error(buffer);
+			break;
+		}
+	}
+}
 
+void SEM_check_possible_types(unmatched_expr_use_t *expr_use, type_t type)
+{
+	if ((expr_use->possible_types & (1 << type)) == 0) {
+		char buffer[MAX_STRING_LENGTH];
+		sprintf(buffer, "Ambiguous expression cannot be of type %s",
+				type_str[type]);
+		SEM_error(buffer);
+	}
+}
+
+void SEM_check_subprog_call_exists(AST_Subprogram *subprogram, char *id)
+{
+	if (subprogram == NULL) {
+		char buffer[MAX_STRING_LENGTH];
+		sprintf(buffer, "Subprogram with id %s does not exist", id);
+		SEM_error(buffer);
+	}
+}
+
+void SEM_check_subprogram_type(unmatched_expr_use_t *expr_use, AST_Subprogram *subprogram)
+{	
+	if (expr_use->is_subroutine == false) {
+		if (subprogram->header->subprogram_type == SUBROUTINE) {
+			char buffer[MAX_STRING_LENGTH];
+			sprintf(buffer, "Subroutine %s cannot have a return value",
+					expr_use->expr->variable->id);
+			SEM_error(buffer);
+		}
+	} 
+	else {
+		if (subprogram->header->subprogram_type == FUNCTION) {
+			char buffer[MAX_STRING_LENGTH];
+			sprintf(buffer, "Function %s cannot be identified as a subroutine",
+					expr_use->expr->variable->id);
+			SEM_error(buffer);
+		}
+	}
+}
+
+void SEM_check_func_call_params(AST_Params *params, AST_Expressions *exprs, char *id)
+{
+	char buffer[MAX_STRING_LENGTH];
+
+	if (params->size != exprs->size) {
+		sprintf(buffer, "Call of function %s has incorrect number of parameters", id);
+		SEM_error(buffer);
+	}
+
+	for (int i = 0; i < params->size; i++) {
+		if (params->elements[i]->datatype->type != exprs->elements[i]->datatype->type) {
+			sprintf(buffer, "Call of function %s has a parameter "
+					"of incorrect type at position %d", id, i+1);
+			SEM_error(buffer);
+		}
+
+		switch (exprs->elements[i]->expr_type)
+		{
+		case EXPR_CONSTANT:
+		case EXPR_BINARY:
+		case EXPR_UNARY:
+		case EXPR_LISTEXPR:
+			if(params->elements[i]->variable->dims != NULL) {
+				sprintf(buffer, "Call of function %s has a scalar parameter "
+						"at position %d, while it should be an array", id, i+1);
+				SEM_error(buffer);
+			}
+
+			break;
+		case EXPR_VARIABLE:
+			if(params->elements[i]->variable->dims != NULL) {
+				if (exprs->elements[i]->variable->dims == NULL) {
+					sprintf(buffer, "Call of function %s has a scalar parameter "
+							"at position %d, while it should be an array", id, i+1);
+					SEM_error(buffer);
+				}
+
+				if (params->elements[i]->variable->dims->size != exprs->elements[i]->dims->size) {
+					sprintf(buffer, "Call of function %s has an array parameter "
+							"at position %d with incorrect number of dims", id, i+1);
+					SEM_error(buffer);
+				}	
+			}
+			else {
+				if (exprs->elements[i]->variable->type != V_ARRAY_ACCESS &&
+					exprs->elements[i]->variable->dims != NULL) {
+					sprintf(buffer, "Call of function %s has an array parameter "
+							"at position %d, while it should be a scalar", id, i+1);
+					SEM_error(buffer);
+				}
+			}
+
+			break;
+		default:
 			break;
 		}
 	}

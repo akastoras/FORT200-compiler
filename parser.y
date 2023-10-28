@@ -175,7 +175,7 @@ with specified associativity (left/right/nonassoc) */
 %%
 
 // High-level structure of a FORT200 program
-program:			{ stbl_increase_scope(); } body T_END { match_labels_to_label_uses(); stbl_clear_scope(); ast_print_body($2, ""); stbl_decrease_scope(); } subprograms { $$ = ast_get_program($2, $5); }
+program:			{ stbl_increase_scope(); } body T_END { match_labels_to_label_uses(); stbl_clear_scope(); stbl_decrease_scope(); } subprograms { $$ = ast_get_program($2, $5); match_funcs_to_unmatched_exprs(); ast_print_body($2, "");}
 					/* | body error T_EOF { yyerror("Expected keyword 'end' at the end of the program"); yyerrok; } */
 
 // Body consisting of variable declarations and statements
@@ -260,7 +260,6 @@ labeled_statement:	label statement{ $$ = $2; stbl_insert_label($1, $2); }
 					| statement		{ $$ = $1; }
 
 label:				T_ICONST { $$ = $1; }
-
 
 statement:			simple_statement { $$ = ast_get_statement(SIMPLE, $1); }
 					| compound_statement  { $$ = NULL; }

@@ -210,7 +210,6 @@ AST_Dim *ast_get_dim_literal(int val)
 	AST_Dim *dim = safe_malloc(sizeof(AST_Dim));
 	dim->type = DIM_LITERAL;
 	dim->val = val;
-	printf("<create:%p>\n", dim);
 	return dim;
 }
 
@@ -565,6 +564,87 @@ AST_SimpleStatement *ast_get_simple_statement(simple_statement_type_t type, void
 
 /* Functions for performing backpatching */
 
+void match_funcs_to_unmatched_exprs()
+{
+	for (int i = 0; i < unmatched_expr_uses.size; i++) {
+		unmatched_expr_use_t *expr_use = unmatched_expr_uses.elements[i];
+		if (expr_use->expr->expr_type == EXPR_BINARY) {
+			AST_Expression *child1 = expr_use->expr->binary.child1;
+			AST_Expression *child2 = expr_use->expr->binary.child2;
+
+			assert(child1->datatype->type != AMBIGUOUS && child2->datatype->type != AMBIGUOUS);
+
+			switch (expr_use->expr->binary.op)
+			{
+			case B_PLUS:
+			case B_MINUS:
+			case B_MUL:
+			case B_DIV:
+				if (child1->datatype->type == CMPLX || child2->datatype->type == CMPLX) {
+					SEM_check_possible_types(expr_use, 	CMPLX);
+					expr_use->expr->datatype->type = CMPLX;
+				}
+				else if (child1->datatype->type == REAL || child2->datatype->type == REAL){
+					SEM_check_possible_types(expr_use, REAL);
+					expr_use->expr->datatype->type = REAL;
+				}
+				else {
+					SEM_check_possible_types(expr_use, INT);
+					expr_use->expr->datatype->type = INT;
+				}
+
+				break;
+			case B_POWER:
+				if (child1->datatype->type == INT) {
+					SEM_check_possible_types(expr_use, child2->datatype->type);
+					expr_use->expr->datatype->type = child2->datatype->type;
+				}
+				else if (child1->datatype->type == REAL) {
+					expr_use->expr->datatype->type = REAL;
+				}
+				else {
+					SEM_check_expr_datatype(child2, O_REAL, false);
+					expr_use->expr->datatype->type = CMPLX;
+				}
+			default:
+				break;
+			}
+		}
+		else if (expr_use->expr->expr_type == EXPR_UNARY) {
+			SEM_check_possible_types(expr_use, expr_use->expr->unary.child->datatype->type);
+			expr_use->expr->datatype->type = expr_use->expr->unary.child->datatype->type;
+		}
+		else if (expr_use->expr->expr_type == EXPR_VARIABLE) {
+			if (expr_use->expr->variable->type == V_FUNC_CALL) {
+				AST_Subprogram *subprogram = stbl_search_subprogram(expr_use->expr->variable->id);
+				SEM_check_subprog_call_exists(subprogram, expr_use->expr->variable->id);
+				SEM_check_subprogram_type(expr_use, subprogram);
+				// TODO: check if it returns list (subprogram->returns_list)
+				SEM_check_possible_types(expr_use, subprogram->header->ret_type);
+				SEM_check_func_call_params(subprogram->header->params,
+										expr_use->expr->variable->exprs,
+										expr_use->expr->variable->id);
+
+				expr_use->expr->variable->datatype->type = subprogram->header->ret_type;
+				// TODO: handle the list depth
+				expr_use->expr->variable->subprog = subprogram;
+				expr_use->expr->variable->args = expr_use->expr->variable->exprs;
+			}
+			else  if (expr_use->expr->variable->type == V_LISTFUNC) {
+				expr_use->expr->datatype->type = expr_use->expr->variable->list->datatype->type;
+			}
+		}
+		else if (expr_use->expr->expr_type == EXPR_LISTEXPR) {
+			type_t type = expr_use->expr->listexpr->elements[0]->datatype->type;
+			for (int i = 1; i < expr_use->expr->listexpr->size; i++) {
+				AST_Expression *expr = expr_use->expr->listexpr->elements[i];
+				SEM_check_expr_datatype(expr, type, false);
+			}
+			expr_use->expr->datatype->type = type;
+		}
+	}
+}
+
 // Insert function call to the table of unmatched expressions
 void insert_unmatched_expr_use(AST_Expression *expr, uint8_t possible_types,
 							bool is_subroutine)
@@ -617,24 +697,24 @@ void impose_constraint_recursively(AST_Expression *expr, uint8_t possible_types)
 		case B_DIV:
 			if (parent->possible_types == O_INTEGER) {
 				if (child1_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child1, O_INTEGER);
+					SEM_check_expr_datatype(child1, O_INTEGER, false);
 				else
 					impose_constraint_recursively(child1, O_INTEGER);
 				
 				if (child2_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child2, O_INTEGER);
+					SEM_check_expr_datatype(child2, O_INTEGER, false);
 				else
 					impose_constraint_recursively(child2, O_INTEGER);
 			}
 			else if (parent->possible_types == O_REAL ||
 					parent->possible_types == (O_INTEGER | O_REAL)) {
 				if (child1_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL, false);
 				else
 					impose_constraint_recursively(child1, O_INTEGER | O_REAL);
 				
 				if (child2_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL, false);
 				else
 					impose_constraint_recursively(child2, O_INTEGER | O_REAL);
 			}
@@ -643,18 +723,18 @@ void impose_constraint_recursively(AST_Expression *expr, uint8_t possible_types)
 		case B_POWER:
 			if (parent->possible_types == O_INTEGER) {
 				if (child1_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child1, O_INTEGER);
+					SEM_check_expr_datatype(child1, O_INTEGER, false);
 				else
 					impose_constraint_recursively(child1, O_INTEGER);
 				
 				if (child2_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child2, O_INTEGER);
+					SEM_check_expr_datatype(child2, O_INTEGER, false);
 				else
 					impose_constraint_recursively(child2, O_INTEGER);
 			}
 			else if (parent->possible_types == O_REAL) {
 				if (child1_type != AMBIGUOUS && child2_type == AMBIGUOUS) {
-					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL, false);
 					
 					if(child1_type == REAL)
 						impose_constraint_recursively(child2, O_INTEGER | O_REAL);
@@ -662,7 +742,7 @@ void impose_constraint_recursively(AST_Expression *expr, uint8_t possible_types)
 						impose_constraint_recursively(child2, O_REAL);
 				}
 				else if (child2_type != AMBIGUOUS && child1_type == AMBIGUOUS) {
-					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL, false);
 					
 					if(child2_type == REAL)
 						impose_constraint_recursively(child1, O_INTEGER | O_REAL);
@@ -676,40 +756,40 @@ void impose_constraint_recursively(AST_Expression *expr, uint8_t possible_types)
 			}
 			else if (parent->possible_types == O_COMPLEX) {
 				if (child1_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child1, O_COMPLEX);
+					SEM_check_expr_datatype(child1, O_COMPLEX, false);
 				else
 					impose_constraint_recursively(child1, O_COMPLEX);
 				
 				if (child2_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child2, O_INTEGER);
+					SEM_check_expr_datatype(child2, O_INTEGER, false);
 				else
 					impose_constraint_recursively(child2, O_INTEGER);
 			}
 			else if (parent->possible_types == (O_INTEGER | O_REAL)) {
 				if (child1_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL, false);
 				else
 					impose_constraint_recursively(child1, O_INTEGER | O_REAL);
 				
 				if (child2_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL, false);
 				else
 					impose_constraint_recursively(child2, O_INTEGER | O_REAL);
 			}
 			else if (parent->possible_types == (O_INTEGER | O_COMPLEX)) {
 				if (child1_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child1, O_INTEGER | O_COMPLEX);
+					SEM_check_expr_datatype(child1, O_INTEGER | O_COMPLEX, false);
 				else
 					impose_constraint_recursively(child1, O_INTEGER | O_COMPLEX);
 				
 				if (child2_type != AMBIGUOUS)
-					SEM_check_expr_datatype(child2, O_INTEGER);
+					SEM_check_expr_datatype(child2, O_INTEGER, false);
 				else
 					impose_constraint_recursively(child2, O_INTEGER);
 			}			
 			else if (parent->possible_types == (O_REAL | O_COMPLEX)){
 				if (child1_type != AMBIGUOUS && child2_type == AMBIGUOUS) {
-					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+					SEM_check_expr_datatype(child1, O_INTEGER | O_REAL, false);
 					
 					if(child1_type == INT)
 						impose_constraint_recursively(child2, O_REAL);
@@ -719,7 +799,7 @@ void impose_constraint_recursively(AST_Expression *expr, uint8_t possible_types)
 						impose_constraint_recursively(child2, O_INTEGER);
 				}
 				else if (child2_type != AMBIGUOUS && child1_type == AMBIGUOUS) {
-					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL, false);
 					
 					if(child2_type == INT)
 						impose_constraint_recursively(child1, O_REAL | O_COMPLEX);
@@ -740,7 +820,7 @@ void impose_constraint_recursively(AST_Expression *expr, uint8_t possible_types)
 	else if (expr->expr_type == EXPR_LISTEXPR) {
 		for (int i = 0; i < expr->listexpr->size; i++) {
 			if (expr->listexpr->elements[i]->datatype->type != AMBIGUOUS)
-				SEM_check_expr_datatype(expr->listexpr->elements[i], parent->possible_types);
+				SEM_check_expr_datatype(expr->listexpr->elements[i], parent->possible_types, false);
 			else
 				impose_constraint_recursively(expr->listexpr->elements[i], parent->possible_types);
 		}
@@ -878,6 +958,7 @@ AST_Variable *ast_get_variable_array_access(AST_Variable *variable, AST_Expressi
 			SEM_check_valid_array_access(variable->decl->variable, exprs);
 			variable->type = V_ARRAY_ACCESS;
 			variable->array = variable->decl->variable;
+			variable->parent_rec = NULL;
 			variable->indices = exprs;
 		}
 	}
@@ -888,6 +969,7 @@ AST_Variable *ast_get_variable_array_access(AST_Variable *variable, AST_Expressi
 		new_variable->datatype = variable->datatype;
 		new_variable->list_depth = variable->list_depth;
 		new_variable->dims = variable->dims;
+		new_variable->parent_rec = variable;
 		new_variable->array = variable->field_var;
 		new_variable->indices = exprs;
 
@@ -956,6 +1038,11 @@ AST_Expression *ast_get_expression_var(AST_Variable *variable)
 	new_expr->list_depth = variable->list_depth;
 	new_expr->dims = variable->dims;
 
+	// Do not insert a listfunc that returns an address in the unmatched table
+	// TODO: Think of how the concept of addresses will affect the datatype mechanism
+	if (variable->type == V_LISTFUNC && variable->listfunc->access == false)
+			return new_expr;
+
 	// Any expression that can only be/uses a function call should be stored in the unmatched table
 	if (variable->datatype->type == AMBIGUOUS) {
 		uint8_t possible_types = O_INTEGER | O_LOGICAL | O_REAL | O_CHARACTER | O_COMPLEX;
@@ -976,8 +1063,6 @@ AST_Expression *ast_get_constant_expr(AST_Constant *constant)
 	new_expr->datatype->fields = NULL;
 	new_expr->dims = NULL;
 
-	printf("Create expression %p from constant with type %d\n",new_expr,
-															constant->type);
 	return new_expr;
 }
 
@@ -1037,7 +1122,7 @@ AST_Expression *ast_get_expression_unary(unary_op_t op_type, AST_Expression *chi
 		new_expr->list_depth = 0;
 		if (child->datatype->type != AMBIGUOUS) {
 			SEM_check_expression_not_list(child);
-			SEM_check_expr_datatype(child, O_INTEGER | O_REAL | O_COMPLEX);
+			SEM_check_expr_datatype(child, O_INTEGER | O_REAL | O_COMPLEX, true);
 		}
 		else {
 			insert_unmatched_expr_use(new_expr, O_INTEGER | O_REAL | O_COMPLEX, false);
@@ -1048,7 +1133,7 @@ AST_Expression *ast_get_expression_unary(unary_op_t op_type, AST_Expression *chi
 	case U_NOT: 
 		if (child->datatype->type != AMBIGUOUS) {
 			SEM_check_expression_not_list(child);
-			SEM_check_expr_datatype(child, O_LOGICAL);
+			SEM_check_expr_datatype(child, O_LOGICAL, true);
 			new_expr->datatype = child->datatype;
 			new_expr->list_depth = 0;
 		}
@@ -1131,12 +1216,12 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 	case B_OR:
 	case B_AND:
 		if (child1->datatype->type != AMBIGUOUS)
-			SEM_check_expr_datatype(child1, O_LOGICAL);
+			SEM_check_expr_datatype(child1, O_LOGICAL, true);
 		else
 			impose_constraint_recursively(child1, O_LOGICAL);
 
 		if (child2->datatype->type != AMBIGUOUS)
-			SEM_check_expr_datatype(child2, O_LOGICAL);
+			SEM_check_expr_datatype(child2, O_LOGICAL, true);
 		else
 			impose_constraint_recursively(child2, O_LOGICAL);
 
@@ -1148,12 +1233,12 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 	case B_DIV:
 		// Check valid datatypes of children or impose a new constraint if they are ambiguous
 		if (child1->datatype->type != AMBIGUOUS)
-			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_COMPLEX);
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_COMPLEX, true);
 		else
 			impose_constraint_recursively(child1, O_INTEGER | O_REAL | O_COMPLEX);
 
 		if (child2->datatype->type != AMBIGUOUS)
-			SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_COMPLEX);
+			SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_COMPLEX, true);
 		else
 			impose_constraint_recursively(child2, O_INTEGER | O_REAL | O_COMPLEX);
 
@@ -1179,12 +1264,12 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 
 		// Ensure the base is either ambiguous or a number
 		if (child1->datatype->type != AMBIGUOUS) {
-			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_COMPLEX);
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_COMPLEX, true);
 
 			// Examine all type combinations of the children
 			if (child1->datatype->type == CMPLX) {
 				if (child2->datatype->type != AMBIGUOUS)
-					SEM_check_expr_datatype(child2, O_INTEGER);
+					SEM_check_expr_datatype(child2, O_INTEGER, true);
 				else
 					impose_constraint_recursively(child2, O_INTEGER);
 
@@ -1192,7 +1277,7 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 			}
 			else { // child1->datatype->type == INT | REAL
 				if (child2->datatype->type != AMBIGUOUS)
-					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL, true);
 				else
 					impose_constraint_recursively(child2, O_INTEGER | O_REAL);
 
@@ -1206,7 +1291,7 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 		}
 		else { // child1->datatype->type == AMBIGUOUS
 			if (child2->datatype->type != AMBIGUOUS) {
-				SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+				SEM_check_expr_datatype(child2, O_INTEGER | O_REAL, true);
 				if (child2->datatype->type == INT) {
 					impose_constraint_recursively(child1, O_INTEGER | O_REAL | O_COMPLEX);
 					insert_unmatched_expr_use(new_expr, O_INTEGER | O_REAL | O_COMPLEX, false);	
@@ -1233,17 +1318,17 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 
 		// Check valid pairs of datatypes of children and typecast if necessary
 		if (child1->datatype->type != AMBIGUOUS) {
-			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_CHARACTER);
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_CHARACTER, true);
 			
 			if (child1->datatype->type == CHAR) {
 				if (child2->datatype->type != AMBIGUOUS)
-					SEM_check_expr_datatype(child2, O_CHARACTER);
+					SEM_check_expr_datatype(child2, O_CHARACTER, true);
 				else
 					impose_constraint_recursively(child2, O_CHARACTER);
 			}
 			else {
 				if (child2->datatype->type != AMBIGUOUS) {
-					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL, true);
 					ast_typecast_int2real(child1, child2);
 					ast_typecast_int2real(child2, child1);
 				}
@@ -1254,7 +1339,7 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 		}
 		else { // child1->datatype->type == AMBIGUOUS
 			if (child2->datatype->type != AMBIGUOUS) {
-				SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_CHARACTER);
+				SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_CHARACTER, true);
 
 				if (child2->datatype->type == CHAR)
 					impose_constraint_recursively(child1, O_CHARACTER);
@@ -1275,17 +1360,17 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 
 		// Check valid pairs of datatypes of children and typecast if necessary
 		if (child1->datatype->type != AMBIGUOUS) {
-			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_CHARACTER | O_COMPLEX);
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL | O_CHARACTER | O_COMPLEX, true);
 			
 			if (child1->datatype->type == CHAR) {
 				if (child2->datatype->type != AMBIGUOUS)
-					SEM_check_expr_datatype(child2, O_CHARACTER);
+					SEM_check_expr_datatype(child2, O_CHARACTER, true);
 				else
 					impose_constraint_recursively(child2, O_CHARACTER);
 			}
 			else {
 				if (child2->datatype->type != AMBIGUOUS) {
-					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_COMPLEX);
+					SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_COMPLEX, true);
 					ast_typecast_int2real(child1, child2);
 					ast_typecast_int2real(child2, child1);
 					ast_typecast_int2cmplx(child1, child2);
@@ -1300,7 +1385,7 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 		}
 		else { // child1->datatype->type == AMBIGUOUS
 			if (child2->datatype->type != AMBIGUOUS) {
-				SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_CHARACTER | O_COMPLEX);
+				SEM_check_expr_datatype(child2, O_INTEGER | O_REAL | O_CHARACTER | O_COMPLEX, true);
 
 				if (child2->datatype->type == CHAR)
 					impose_constraint_recursively(child1, O_CHARACTER);
@@ -1319,18 +1404,18 @@ AST_Expression *ast_get_expression_binary(binary_op_t operation,
 		new_expr->datatype->type = CMPLX;
 
 		if (child1->datatype->type != AMBIGUOUS && child2->datatype->type != AMBIGUOUS) {
-			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
-			SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL, true);
+			SEM_check_expr_datatype(child2, O_INTEGER | O_REAL, true);
 
 			ast_typecast_int2real(child1, child2);
 			ast_typecast_int2real(child2, child1);
 		}
 		else if (child1->datatype->type != AMBIGUOUS) {
-			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL);
+			SEM_check_expr_datatype(child1, O_INTEGER | O_REAL, true);
 			impose_constraint_recursively(child2, O_INTEGER | O_REAL);
 		}
 		else if (child2->datatype->type != AMBIGUOUS) {
-			SEM_check_expr_datatype(child2, O_INTEGER | O_REAL);
+			SEM_check_expr_datatype(child2, O_INTEGER | O_REAL, true);
 			impose_constraint_recursively(child1, O_INTEGER | O_REAL);
 		}
 		else {
@@ -1503,8 +1588,6 @@ AST_Assignment *ast_get_assignment_expression(AST_Variable *variable,
 			ast_variable_id2decl(variable, false);
 	}
 	
-	printf("Create new assignment node with variable and expression\n");
-
 	AST_Assignment *asmt = safe_malloc(sizeof(AST_Assignment));
 
 	asmt->variable = variable;
@@ -1546,7 +1629,7 @@ AST_Params *ast_insert_param_to_params(AST_Params *old_params,
 		new_params->size = 0;
 		new_params->elements = NULL;
 	}
-	else{
+	else {
 		new_params = old_params;
 	}
 
@@ -1772,31 +1855,51 @@ void ast_print_fields(AST_Fields *fields, char *tabs)
 {
 	for (int i = 0; i < fields->size; i++) {
 		AST_Field *field = fields->elements[i];
-		printf("%s%s", tabs, type_str[field->type]);
+		printf("%s%s ", tabs, type_str[field->type]);
 		
 		if (field->type != REC) {
 
 			AST_Vars *vars = field->vars;
 			for (int j = 0; j < vars->size; j++) {
 				AST_UndefVar *uvar = vars->elements[j];
-				printf(" <LDEPTH-%d> ", uvar->list_depth);
-				
+				if (uvar->list_depth)
+					printf("<LDEPTH-%d> ", uvar->list_depth);
+
 				if (uvar->type == ARRAY) {
-					printf("dims:");
+					printf("%s", uvar->id);
 					ast_print_dims(uvar->dims);
+					putchar(' ');
 				}
-
-				printf("%s", uvar->id);
+				else {
+					printf("%s ", uvar->id);
+				}
 			}
-
 			putchar('\n');
 		}
 		else {
 			char *mtabs = more_tabs(tabs);
+			putchar('\n');
 			ast_print_fields(field->fields, mtabs);
+			printf("%s", tabs);
+
+			AST_Vars *vars = field->vars;
+			for (int j = 0; j < vars->size; j++) {
+				AST_UndefVar *uvar = vars->elements[j];
+				if (uvar->list_depth)
+					printf("<LDEPTH-%d> ", uvar->list_depth);
+
+				if (uvar->type == ARRAY) {
+					printf("%s", uvar->id);
+					ast_print_dims(uvar->dims);
+					putchar(' ');
+				}
+				else {
+					printf("%s ", uvar->id);
+				}
+			}
+			putchar('\n');
 		}
 	}
-	printf("%s", tabs);
 	return;
 }
 
@@ -1806,19 +1909,18 @@ void ast_print_datatype(AST_GeneralType *datatype, char *tabs)
 {
 	char *mtabs = more_tabs(tabs);
 	
-	printf("%s%s", tabs, type_str[datatype->type]);
+	printf("%s%s ", tabs, type_str[datatype->type]);
 	if (datatype->type == REC) {
 		printf("\n");
 		ast_print_fields(datatype->fields, mtabs);
+		printf("%s", tabs);
 	}
 }
 
-void ast_print_undefVar(AST_UndefVar *variable, char *tabs)
+void ast_print_undefVar(AST_UndefVar *variable)
 {
-	printf("%s", tabs);
-	if (variable->list_depth) {
-		printf("list(depth:%d) ", variable->list_depth);
-	}
+	if (variable->list_depth)
+		printf("<LDEPTH-%d>  ", variable->list_depth);
 
 	printf("%s", variable->id);
 	if (variable->type == ARRAY)
@@ -1826,43 +1928,122 @@ void ast_print_undefVar(AST_UndefVar *variable, char *tabs)
 	printf("\n");
 }
 
+void ast_print_func_call(AST_Header *header, AST_Expressions *args, char *tabs)
+{
+	printf("%s%s%s FUNCTION %s :\n", tabs, type_str[header->ret_type],
+			(header->returns_list) ? "LIST" : "", header->id);
+
+	tabs = more_tabs(tabs);
+	for (int i = 0; i < args->size; i++) {
+		ast_print_datatype(header->params->elements[i]->datatype, tabs);
+		
+		for (int j = 0; j < header->params->elements[i]->variable->list_depth; j++)
+			printf(" LIST");
+		
+		printf(" %s", header->params->elements[i]->variable->id);
+		ast_print_dims(header->params->elements[i]->variable->dims);
+		printf(" =\n");
+		ast_print_expression(args->elements[i], more_tabs(tabs));
+	}
+
+	printf("\n");
+}
+
+void ast_print_array_access(AST_Variable *variable, char *tabs)
+{
+	AST_Variable *parent_rec = variable->parent_rec;
+	AST_UndefVar *array = variable->array;
+	AST_Expressions *indices = variable->indices;
+	AST_GeneralType *datatype = variable->datatype;
+	
+	if (parent_rec != NULL) {
+		printf("%s%s\n", tabs, array->id);
+		ast_print_expressions(indices, more_tabs(tabs));
+		ast_print_variable_access(parent_rec->record, tabs);
+	}
+	else {
+		ast_print_datatype(datatype, tabs);
+		ast_print_undefVar(array);
+		printf("%sARRAY ACCESS INDICES: \n", tabs);
+		ast_print_expressions(indices, more_tabs(tabs));
+	}
+}
+
 void ast_print_variable_access(AST_Variable *variable, char *tabs) 
 {	
 	char *variable_type_str[] = {
 		"ID", "DECL", "FUNC_CALL", "ARRAY_ACCESS", "REC_ACCESS", "LISTFUNC"
 	};
-	printf("%svariable type: %s\n", tabs, variable_type_str[variable->type]);
+
+	static bool initial_rec_access = true;
+	char *mtabs;
+
+	if (variable->type != V_REC_ACCESS)
+		printf("\n%sVariable type: %s\n", tabs, variable_type_str[variable->type]);
 
 	switch(variable->type) {
 		case V_DECL:
 			ast_print_decl(variable->decl, tabs);
 			break;
 		case V_REC_ACCESS:
-			printf("%s(printing record not supported yet)\n", tabs);
+			if (initial_rec_access) {
+				mtabs = more_tabs(tabs);
+				initial_rec_access = false;
+			}
+			else {
+				mtabs = tabs;
+			}
+
+			printf("\n%sVariable type: %s\n", mtabs, variable_type_str[variable->type]);
+			printf("%sField: %s\n%sRecord:\n", mtabs, variable->field_var->id, mtabs);
+			ast_print_variable_access(variable->record, mtabs);
+			
+			break;
+		case V_ARRAY_ACCESS:
+			ast_print_array_access(variable, tabs);
+			break;
+		case V_FUNC_CALL:
+			ast_print_func_call(variable->subprog->header, variable->args, tabs);
+			break;
+		case V_LISTFUNC:
+			mtabs = more_tabs(tabs);
+			printf("%sLISTFUNC:\n", tabs);
+
+			if (variable->listfunc->access)
+				printf("%sDo %d hops and get list node data\n", mtabs, variable->listfunc->hops);
+			else
+				printf("%sDo %d hops and get list node address\n", mtabs, variable->listfunc->hops);
+			
+			printf("%sLIST:\n", tabs);
+			ast_print_expression(variable->list, mtabs);
+			
 			break;
 		default:
 			break;
 	}
 }
 
+
 void ast_print_constant(AST_Constant* constant, char *tabs)
 {
+	char *mtabs = more_tabs(tabs);
+
 	switch (constant->type)
 	{
 	case INT:
-		printf("%sINT(%d)\n", tabs, constant->intval);
+		printf("%sINT(%d)\n", mtabs, constant->intval);
 		break;
 	case REAL:
-		printf("%sREAL(%lf)\n", tabs, constant->rval);
+		printf("%sREAL(%lf)\n", mtabs, constant->rval);
 		break;
 	case LOG:
-		printf("%sLOG(%d)\n", tabs, constant->lval);
+		printf("%sLOG(%d)\n", mtabs, constant->lval);
 		break;
 	case CHAR:
-		printf("%sCHAR(%c)\n", tabs, constant->charval);
+		printf("%sCHAR(%c)\n", mtabs, constant->charval);
 		break;
 	case CMPLX:
-		printf("%sCMPLX(%lf, %lf)\n", tabs, constant->cmplxval.re,
+		printf("%sCMPLX(%lf, %lf)\n", mtabs, constant->cmplxval.re,
 											constant->cmplxval.im);
 	default:
 		break;
@@ -1881,7 +2062,7 @@ void ast_print_initial_value(AST_Values *values, char *tabs)
 void ast_print_decl(decl_t *decl, char *tabs)
 {
 	ast_print_datatype(decl->datatype, tabs);
-	ast_print_undefVar(decl->variable, " ");
+	ast_print_undefVar(decl->variable);
 	if (decl->initial_value != NULL)
 		ast_print_initial_value(decl->initial_value, tabs);
 	printf("\n");
